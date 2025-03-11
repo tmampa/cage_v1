@@ -1,0 +1,39 @@
+# Project Name
+CagE 
+- A Cyber Security Awareness Game
+
+# Project Type
+Mobile Game
+
+# Stack
+Next.js
+Tailwind CSS
+React
+Firebase
+Framer Motion
+next-pwa
+matter.js
+use-gesture
+@heroicons/react
+
+# Project Structure
+
+App router
+
+# About the Game
+
+CagE is a mobile game that teaches users about cyber security awareness.
+Users play quiz based games to learn about cyber security.
+It has a leaderboard to compare scores with friends.
+
+# Gameplay
+
+Users start with a basic level and progress to more advanced levels.
+Each level contains a series of questions and answers.
+Users earn points for correct answers and lose points for incorrect answers.
+Users can earn rewards for completing levels and answering questions.
+
+# Features
+
+Leaderboard
+Rewards
