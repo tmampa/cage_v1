@@ -382,9 +382,12 @@ export default function GameplayPage({ params }) {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Link href={`/game/play/${id}`}>
-                <button className="btn-primary w-full">Play Again</button>
-              </Link>
+              <button 
+                onClick={() => window.location.reload()}
+                className="btn-primary w-full"
+              >
+                Play Again
+              </button>
               <Link href="/game/levels">
                 <button className="btn-secondary w-full">Back to Levels</button>
               </Link>
@@ -473,9 +476,12 @@ export default function GameplayPage({ params }) {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Link href={`/game/play/${id}`}>
-                <button className="btn-primary w-full">Play Again</button>
-              </Link>
+              <button 
+                onClick={() => window.location.reload()}
+                className="btn-primary w-full"
+              >
+                Play Again
+              </button>
               <Link href="/game/levels">
                 <button className="btn-secondary w-full">Back to Levels</button>
               </Link>

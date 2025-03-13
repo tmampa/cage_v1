@@ -67,16 +67,18 @@ function createPromptForLevel(level) {
   const count = level.questionsCount;
   
   return `
-  Generate ${count} multiple-choice questions about ${topics} for children learning about cyber security.
+  Generate ${count} multiple-choice questions about ${topics} for everyone learning about cyber security.
   
-  These questions should be at a ${difficulty} difficulty level suitable for children aged 8-14.
+  These questions should be at a ${difficulty} difficulty level suitable for everyone.
   
   For each question:
-  1. Make the language simple and child-friendly
+  1. Make the language simple and friendly
   2. Provide one correct answer and three incorrect answers
   3. Include a brief explanation why the correct answer is right
   4. The incorrect answers should be plausible but clearly wrong
-  5. Keep the questions practical and relevant to children's everyday online activities
+  5. Keep the questions practical and relevant to everyone's everyday online activities
+  6. IMPORTANT: Randomize which option (A, B, C, or D) is the correct answer for each question
+  7. DO NOT make the first option (A) the correct answer for most or all questions
   
   Format your response as a JSON array of objects with the following structure:
   [
@@ -91,6 +93,31 @@ function createPromptForLevel(level) {
   
   Only return the JSON, with no additional text before or after.
   `;
+}
+
+/**
+ * Shuffles the options of a question and updates the correctIndex
+ * @param {Object} question - The question object with options and correctIndex
+ * @returns {Object} - Question with shuffled options and updated correctIndex
+ */
+function shuffleQuestionOptions(question) {
+  // Create pairs of options and their indices
+  const pairs = question.options.map((option, index) => ({
+    option,
+    isCorrect: index === question.correctIndex
+  }));
+  
+  // Shuffle the pairs
+  for (let i = pairs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pairs[i], pairs[j]] = [pairs[j], pairs[i]];
+  }
+  
+  // Update the question object
+  question.options = pairs.map(p => p.option);
+  question.correctIndex = pairs.findIndex(p => p.isCorrect);
+  
+  return question;
 }
 
 /**
@@ -133,7 +160,11 @@ export async function generateQuestionsForLevel(levelId) {
       cleanedText = cleanedText.trim();
       
       const questions = JSON.parse(cleanedText);
-      return questions;
+      
+      // Shuffle the options for each question to further randomize correct answers
+      const shuffledQuestions = questions.map(q => shuffleQuestionOptions(q));
+      
+      return shuffledQuestions;
     } catch (e) {
       console.error("Failed to parse Gemini response as JSON:", e);
       console.log("Raw response:", text);
