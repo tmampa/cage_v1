@@ -2,14 +2,15 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { LockClosedIcon, LockOpenIcon, ArrowLeftIcon, StarIcon, TrophyIcon, UserIcon, HomeIcon, PuzzlePieceIcon } from "@heroicons/react/24/solid";
+import { LockClosedIcon, LockOpenIcon, ArrowLeftIcon, StarIcon, TrophyIcon, UserIcon, HomeIcon, PuzzlePieceIcon, CheckIcon } from "@heroicons/react/24/solid";
 import { motion } from "framer-motion";
 import { useAuth } from "../../../context/AuthContext";
+import { getUnlockedLevels, getUserProgress } from "../../../utils/gameProgress";
 
 export default function LevelsPage() {
   const { user, userProfile } = useAuth();
   
-  // Mock data for levels
+  // State for levels and user progress
   const [levels, setLevels] = useState([
     {
       id: 1,
@@ -28,7 +29,7 @@ export default function LevelsPage() {
       title: "Password Protection",
       description: "Create strong passwords and keep them safe",
       difficulty: "Easy",
-      unlocked: true,
+      unlocked: false,
       completed: false,
       icon: "🔑",
       color: "from-green-400 to-green-600",
@@ -84,6 +85,60 @@ export default function LevelsPage() {
       questions: 10
     }
   ]);
+  
+  // Track user progress stats
+  const [progressStats, setProgressStats] = useState({
+    unlockedCount: 1,
+    completedCount: 0,
+    progressPercentage: 0
+  });
+  
+  // Load user progress from Supabase
+  useEffect(() => {
+    const loadUserProgress = async () => {
+      if (!user?.id) return;
+      
+      try {
+        // Get unlocked levels
+        const unlockedLevelIds = await getUnlockedLevels(user.id);
+        
+        // Get progress for all levels
+        const userProgress = await getUserProgress(user.id);
+        
+        // Update levels with unlocked and completed status
+        const updatedLevels = levels.map(level => {
+          const isUnlocked = unlockedLevelIds.includes(level.id);
+          const progress = userProgress.find(p => p.level_id === level.id);
+          const isCompleted = progress?.completed || false;
+          const levelScore = progress?.score || 0;
+          
+          return {
+            ...level,
+            unlocked: isUnlocked,
+            completed: isCompleted,
+            userScore: levelScore
+          };
+        });
+        
+        setLevels(updatedLevels);
+        
+        // Calculate progress stats
+        const unlockedCount = unlockedLevelIds.length;
+        const completedCount = userProgress.filter(p => p.completed).length;
+        const progressPercentage = Math.round((unlockedCount / levels.length) * 100);
+        
+        setProgressStats({
+          unlockedCount,
+          completedCount,
+          progressPercentage
+        });
+      } catch (error) {
+        console.error("Error loading user progress:", error);
+      }
+    };
+    
+    loadUserProgress();
+  }, [user?.id]);
 
   // Animation variants
   const containerVariants = {
@@ -170,11 +225,14 @@ export default function LevelsPage() {
           {/* Progress bar */}
           <div className="mt-3">
             <div className="flex justify-between text-xs text-blue-700 mb-1">
-              <span>Levels Unlocked: 2/6</span>
-              <span>Completed: 0/6</span>
+              <span>Levels Unlocked: {progressStats.unlockedCount}/{levels.length}</span>
+              <span>Completed: {progressStats.completedCount}/{levels.length}</span>
             </div>
             <div className="h-3 bg-blue-100 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-blue-400 to-purple-500 rounded-full" style={{ width: '33%' }}></div>
+              <div 
+                className="h-full bg-gradient-to-r from-blue-400 to-purple-500 rounded-full" 
+                style={{ width: `${progressStats.progressPercentage}%` }}
+              ></div>
             </div>
           </div>
         </div>
@@ -223,11 +281,21 @@ export default function LevelsPage() {
                 </div>
                 
                 {level.unlocked ? (
-                  <Link href={`/game/play/${level.id}`}>
-                    <button className="btn-primary w-full py-1.5 text-xs">
-                      Play Now
-                    </button>
-                  </Link>
+                  <>
+                    {level.completed && (
+                      <div className="flex justify-between text-xs mb-2">
+                        <span className="text-green-600 font-semibold flex items-center">
+                          <CheckIcon className="w-3 h-3 mr-1" />Completed
+                        </span>
+                        <span className="text-blue-600 font-semibold">{level.userScore || 0} pts</span>
+                      </div>
+                    )}
+                    <Link href={`/game/play/${level.id}`}>
+                      <button className="btn-primary w-full py-1.5 text-xs">
+                        {level.completed ? "Play Again" : "Play Now"}
+                      </button>
+                    </Link>
+                  </>
                 ) : (
                   <button className="bg-gray-200 text-gray-500 py-1.5 px-3 rounded-full w-full cursor-not-allowed font-bold text-xs">
                     Locked

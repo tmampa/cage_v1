@@ -9,14 +9,16 @@ import { useAuth } from "../../../../context/AuthContext";
 import { generateQuestionsForLevel, getLevelDefinitions } from "../../../../utils/generateQuestions";
 import { supabase } from "../../../../lib/supabase";
 import React from "react";
+import { saveLevelProgress, getLevelProgress } from "../../../../utils/gameProgress";
 
 export default function GameplayPage({ params }) {
   const router = useRouter();
-  // Unwrap params with React.use() to avoid direct access warning
+  const { user, userProfile, updateProfile } = useAuth();
+  
+  // Unwrap params using React.use()
   const unwrappedParams = React.use(params);
   const id = unwrappedParams.id;
   const levelId = parseInt(id);
-  const { user, userProfile, updateProfile } = useAuth();
   
   // State management
   const [loading, setLoading] = useState(true);
@@ -34,6 +36,9 @@ export default function GameplayPage({ params }) {
   const [isAnswerCorrect, setIsAnswerCorrect] = useState(null);
   const [generatingQuestions, setGeneratingQuestions] = useState(true);
   const [usingAIQuestions, setUsingAIQuestions] = useState(false);
+  
+  // Ref for the timer
+  const timerRef = React.useRef(null);
 
   // Animation variants
   const containerVariants = {
@@ -47,7 +52,7 @@ export default function GameplayPage({ params }) {
   };
 
   const itemVariants = {
-    hidden: { y: 10, opacity: 0 },
+    hidden: { y: 20, opacity: 0 },
     visible: {
       y: 0,
       opacity: 1,
@@ -62,115 +67,160 @@ export default function GameplayPage({ params }) {
   useEffect(() => {
     const loadLevelAndQuestions = async () => {
       try {
-        // Get level definitions
-        const levels = getLevelDefinitions();
-        const currentLevel = levels.find(l => l.id === levelId);
+        setLoading(true);
+        setError(null);
+        
+        // Get all level definitions
+        const levelDefinitions = getLevelDefinitions();
+        
+        // Find the current level
+        const currentLevel = levelDefinitions.find(l => l.id === levelId);
         
         if (!currentLevel) {
-          setError("Level not found");
-          setLoading(false);
-          return;
+          throw new Error(`Level with ID ${levelId} not found`);
         }
         
         setLevel(currentLevel);
         
-        // Check if user is logged in
-        if (!user) {
-          router.push("/auth/login");
-          return;
+        // Check for existing progress
+        let userProgress = null;
+        if (user?.id) {
+          userProgress = await getLevelProgress(user.id, levelId);
         }
         
-        // Try to generate AI questions
+        // Generate new questions or load existing ones
         try {
           setGeneratingQuestions(true);
+          
+          // Generate AI questions
           const generatedQuestions = await generateQuestionsForLevel(levelId);
           setQuestions(generatedQuestions);
           setUsingAIQuestions(true);
-          setGeneratingQuestions(false);
-          setLoading(false);
-        } catch (aiError) {
-          console.warn("Could not generate AI questions, falling back to default questions:", aiError);
+          
+          console.log(`Generated ${generatedQuestions.length} AI questions for level ${levelId}`);
+        } catch (error) {
+          console.log("Could not generate AI questions, falling back to default questions:", error);
+          
+          // Fallback to default questions
+          const defaultQuestions = [
+            {
+              question: "What is a strong password?",
+              options: [
+                "Your name and birthday",
+                "A single word like 'password'",
+                "A mix of letters, numbers, and symbols",
+                "The same password you use everywhere"
+              ],
+              correctIndex: 2,
+              explanation: "Strong passwords use a combination of uppercase and lowercase letters, numbers, and special characters. They should be at least 12 characters long and not contain personal information."
+            },
+            {
+              question: "What should you do if you receive an email asking for your password?",
+              options: [
+                "Reply with your password",
+                "Click on any links in the email",
+                "Ignore it and delete the email",
+                "Share the email with friends"
+              ],
+              correctIndex: 2,
+              explanation: "Legitimate organizations will never ask for your password via email. These are phishing attempts to steal your information."
+            },
+            {
+              question: "What is two-factor authentication?",
+              options: [
+                "Using two different passwords",
+                "Using something you know and something you have",
+                "Sharing your password with two friends",
+                "Logging in twice"
+              ],
+              correctIndex: 1,
+              explanation: "Two-factor authentication adds an extra layer of security by requiring both something you know (password) and something you have (like a code sent to your phone)."
+            },
+            {
+              question: "Which of these is a sign of a secure website?",
+              options: [
+                "A padlock icon in the address bar",
+                "Lots of pop-up advertisements",
+                "URLs that start with 'http://'",
+                "Requests for personal information"
+              ],
+              correctIndex: 0,
+              explanation: "Secure websites use HTTPS encryption, shown by a padlock icon in the address bar. This means your data is encrypted when sent to that site."
+            },
+            {
+              question: "What is malware?",
+              options: [
+                "A type of computer hardware",
+                "Software that protects your computer",
+                "Harmful software designed to damage or gain unauthorized access",
+                "A type of strong password"
+              ],
+              correctIndex: 2,
+              explanation: "Malware (malicious software) includes viruses, worms, trojans, and ransomware that can harm your device or steal your information."
+            }
+          ];
+          setQuestions(defaultQuestions);
           setUsingAIQuestions(false);
-          setGeneratingQuestions(false);
-          setLoading(false);
-          // Default questions will be used (already in state)
         }
-      } catch (error) {
-        console.error("Failed to load level:", error);
-        setError("Failed to load level information");
+        
+        setCurrentQuestionIndex(0);
+        setScore(0);
+        setLives(3);
         setGeneratingQuestions(false);
+        setShowExplanation(false);
+        setSelectedAnswer(null);
+        setTimeLeft(30);
+        setGameOver(false);
+        setLevelComplete(false);
+        
+      } catch (error) {
+        console.error("Error loading level:", error);
+        setError(`Failed to load level: ${error.message}`);
+      } finally {
         setLoading(false);
       }
     };
     
     loadLevelAndQuestions();
-  }, [levelId, user, router]);
+    
+    // Cleanup function
+    return () => {
+      clearTimeout(timerRef.current);
+    };
+  }, [levelId, user?.id]);
 
-  // Default questions if AI generation fails
-  const defaultQuestions = [
-    {
-      question: "What is a strong password?",
-      options: [
-        "Your name and birthday",
-        "A single word like 'password'",
-        "A mix of letters, numbers, and symbols",
-        "The same password you use everywhere"
-      ],
-      correctIndex: 2,
-      explanation: "Strong passwords use a combination of uppercase and lowercase letters, numbers, and special characters. They should be at least 12 characters long and not contain personal information."
-    },
-    {
-      question: "What should you do if you receive an email asking for your password?",
-      options: [
-        "Reply with your password",
-        "Click on any links in the email",
-        "Ignore it and delete the email",
-        "Share the email with friends"
-      ],
-      correctIndex: 2,
-      explanation: "Legitimate organizations will never ask for your password via email. These are phishing attempts to steal your information."
-    },
-    {
-      question: "What is two-factor authentication?",
-      options: [
-        "Using two different passwords",
-        "Using something you know and something you have",
-        "Sharing your password with two friends",
-        "Logging in twice"
-      ],
-      correctIndex: 1,
-      explanation: "Two-factor authentication adds an extra layer of security by requiring both something you know (password) and something you have (like a code sent to your phone)."
-    },
-    {
-      question: "Which of these is a sign of a secure website?",
-      options: [
-        "A padlock icon in the address bar",
-        "Lots of pop-up advertisements",
-        "URLs that start with 'http://'",
-        "Requests for personal information"
-      ],
-      correctIndex: 0,
-      explanation: "Secure websites use HTTPS encryption, shown by a padlock icon in the address bar. This means your data is encrypted when sent to that site."
-    },
-    {
-      question: "What is malware?",
-      options: [
-        "A type of computer hardware",
-        "Software that protects your computer",
-        "Harmful software designed to damage or gain unauthorized access",
-        "A type of strong password"
-      ],
-      correctIndex: 2,
-      explanation: "Malware (malicious software) includes viruses, worms, trojans, and ransomware that can harm your device or steal your information."
+  // Handle level complete
+  const completedLevel = async () => {
+    // Stop the timer
+    clearTimeout(timerRef.current);
+    
+    // Calculate results
+    const correctAnswers = Math.floor(score / 100);
+    const totalQuestions = questions.length;
+    const passThreshold = Math.floor(totalQuestions * 0.6); // 60% correct to pass
+    const passed = correctAnswers >= passThreshold;
+    
+    setLevelComplete(true);
+    
+    // Save progress to Supabase
+    if (user?.id) {
+      try {
+        await saveLevelProgress(
+          user.id,
+          levelId,
+          score,
+          passed
+        );
+        
+        // If this level was completed successfully, we'll unlock the next level
+        // (handled in the saveLevelProgress function)
+        
+        console.log(`Progress saved for level ${levelId}`);
+      } catch (error) {
+        console.error("Error saving progress:", error);
+      }
     }
-  ];
-
-  // Use default questions if AI generation failed
-  useEffect(() => {
-    if (!usingAIQuestions && !loading && questions.length === 0) {
-      setQuestions(defaultQuestions);
-    }
-  }, [usingAIQuestions, loading, questions.length]);
+  };
 
   // Current question
   const currentQuestion = questions[currentQuestionIndex];
@@ -244,45 +294,7 @@ export default function GameplayPage({ params }) {
       setIsAnswerCorrect(null);
     } else {
       // Level completed - save progress
-      saveLevelProgress();
-      setLevelComplete(true);
-    }
-  };
-
-  // Save level progress to database
-  const saveLevelProgress = async () => {
-    if (user && userProfile) {
-      try {
-        // Calculate pass/fail and completion status
-        const totalQuestions = questions.length;
-        const passThreshold = Math.floor(totalQuestions * 0.6); // 60% correct to pass
-        const correctAnswers = Math.floor(score / 100);
-        const passed = correctAnswers >= passThreshold;
-        
-        // Create record of this game session
-        const { data, error } = await supabase
-          .from('game_sessions')
-          .insert([
-            { 
-              user_id: user.id,
-              level_id: levelId,
-              score: score,
-              passed: passed,
-              completed_at: new Date()
-            }
-          ]);
-          
-        if (error) throw error;
-        
-        // Update user's total score
-        const newTotalScore = (userProfile.score || 0) + score;
-        await updateProfile({
-          score: newTotalScore,
-          updated_at: new Date()
-        });
-      } catch (err) {
-        console.error("Failed to update profile:", err);
-      }
+      completedLevel();
     }
   };
 
@@ -565,10 +577,8 @@ export default function GameplayPage({ params }) {
 
         {/* Timer */}
         <div className="mb-4 flex justify-end">
-          <div className={`flex items-center gap-2 py-1 px-3 rounded-full ${
-            timeLeft > 15 ? 'bg-green-100 text-green-700' : 
-            timeLeft > 5 ? 'bg-yellow-100 text-yellow-700' : 
-            'bg-red-100 text-red-700 animate-pulse'
+          <div className={`flex items-center py-1 px-3 rounded-full ${
+            timeLeft <= 5 ? 'bg-red-100 text-red-700 animate-pulse' : 'bg-blue-100 text-blue-700'
           }`}>
             <ClockIcon className="w-5 h-5" />
             <span className="font-bold">{timeLeft}s</span>
@@ -584,7 +594,7 @@ export default function GameplayPage({ params }) {
             exit={{ opacity: 0, y: -20 }}
             className="game-card p-5 mb-4"
           >
-            <h3 className="text-lg font-semibold mb-4">{currentQuestion.question}</h3>
+            <h3 className="text-xl font-bold mb-4 text-blue-800">{currentQuestion?.question}</h3>
             
             {/* Answer options */}
             <motion.div
