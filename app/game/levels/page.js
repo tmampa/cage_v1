@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { LockClosedIcon, LockOpenIcon, ArrowLeftIcon, StarIcon, TrophyIcon, UserIcon } from "@heroicons/react/24/solid";
+import { LockClosedIcon, LockOpenIcon, ArrowLeftIcon, StarIcon, TrophyIcon, UserIcon, HomeIcon, PuzzlePieceIcon } from "@heroicons/react/24/solid";
 import { motion } from "framer-motion";
 import { useAuth } from "../../../context/AuthContext";
 
@@ -109,7 +109,7 @@ export default function LevelsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-300 to-purple-300 text-blue-900 p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-b from-blue-300 to-purple-300 text-blue-900 relative overflow-hidden pb-20">
       {/* Decorative bubbles */}
       <div className="bubble w-20 h-20 top-20 left-10 opacity-60"></div>
       <div className="bubble w-16 h-16 top-40 right-10 opacity-60"></div>
@@ -130,123 +130,108 @@ export default function LevelsPage() {
         </div>
       )}
       
-      {/* Header with back button */}
-      <div className="container mx-auto mb-4 sm:mb-6">
-        <Link href="/" className="inline-flex items-center text-blue-700 hover:text-blue-900">
-          <ArrowLeftIcon className="w-5 h-5 mr-2" />
-          <span>Back to Home</span>
-        </Link>
+      {/* Header section */}
+      <div className="pt-4 px-4">
         <motion.div
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.5 }}
-          className="text-center mt-4"
+          className="text-center mt-4 mb-6"
         >
-          <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-blue-600 mb-2">Choose Your Level</h1>
-          <p className="text-center text-blue-700 mb-4">Complete levels to unlock new challenges and earn points!</p>
+          <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-blue-600 mb-2">Choose Your Level</h1>
+          <p className="text-center text-blue-700 text-sm">Complete levels to unlock new challenges!</p>
         </motion.div>
       </div>
 
-      {/* Progress overview */}
+      {/* Progress overview - more compact for mobile */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="container mx-auto mb-6"
+        className="px-4 mb-6"
       >
-        <div className="game-card p-4 sm:p-5">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="game-card p-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-4">
-                <TrophyIcon className="w-6 h-6 text-yellow-500" />
+              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                <TrophyIcon className="w-5 h-5 text-yellow-500" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-purple-700">Your Progress</h3>
-                <p className="text-blue-700 text-sm">Keep going to unlock all levels!</p>
+                <h3 className="text-base font-bold text-purple-700">Your Progress</h3>
+                <p className="text-blue-700 text-xs">Keep playing to unlock more!</p>
               </div>
             </div>
-            <div className="flex gap-4 sm:gap-8">
-              <div className="text-center">
-                <p className="text-xs text-blue-600">Completed</p>
-                <p className="text-2xl font-bold text-purple-700">0/6</p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-blue-600">Unlocked</p>
-                <p className="text-2xl font-bold text-purple-700">2/6</p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-blue-600">Points</p>
-                <p className="text-2xl font-bold text-purple-700">{userProfile?.score || 0}</p>
-              </div>
+            <div>
+              <p className="text-xs text-blue-600">Points</p>
+              <p className="text-xl font-bold text-purple-700">{userProfile?.score || 0}</p>
+            </div>
+          </div>
+          
+          {/* Progress bar */}
+          <div className="mt-3">
+            <div className="flex justify-between text-xs text-blue-700 mb-1">
+              <span>Levels Unlocked: 2/6</span>
+              <span>Completed: 0/6</span>
+            </div>
+            <div className="h-3 bg-blue-100 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-blue-400 to-purple-500 rounded-full" style={{ width: '33%' }}></div>
             </div>
           </div>
         </div>
       </motion.div>
 
-      {/* Levels grid */}
+      {/* Levels grid - 2x2 layout */}
       <motion.div
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="container mx-auto px-2 sm:px-4"
+        className="px-4"
       >
-        {/* Grid layout for levels */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
+        <div className="grid grid-cols-2 gap-3">
           {levels.map((level) => (
             <motion.div
               key={level.id}
               variants={itemVariants}
               whileHover={{ scale: 1.03 }}
-              className="game-card overflow-hidden shadow-lg h-full"
+              whileTap={{ scale: 0.98 }}
+              className="game-card overflow-hidden shadow-md"
             >
-              <div className={`bg-gradient-to-r ${level.color} p-4 text-white relative`}>
+              <div className={`bg-gradient-to-r ${level.color} p-3 text-white relative`}>
                 <div className="flex justify-between items-center">
-                  <span className="text-4xl sm:text-5xl drop-shadow-md">{level.icon}</span>
-                  <div className="bg-white bg-opacity-20 rounded-full p-2">
+                  <span className="text-3xl drop-shadow-md">{level.icon}</span>
+                  <div className="bg-white bg-opacity-20 rounded-full p-1.5">
                     {level.unlocked ? (
-                      <LockOpenIcon className="w-6 h-6 text-white" />
+                      <LockOpenIcon className="w-4 h-4 text-white" />
                     ) : (
-                      <LockClosedIcon className="w-6 h-6 text-white" />
+                      <LockClosedIcon className="w-4 h-4 text-white" />
                     )}
                   </div>
                 </div>
-                <h2 className="text-lg sm:text-xl font-bold mt-3 line-clamp-1">{level.title}</h2>
+                <h2 className="text-sm font-bold mt-2 line-clamp-1">{level.title}</h2>
               </div>
               
-              <div className="p-4 sm:p-5 flex flex-col h-full">
-                <p className="text-blue-700 mb-4 flex-grow text-sm sm:text-base line-clamp-2 sm:line-clamp-3">{level.description}</p>
+              <div className="p-3 flex flex-col">
+                <p className="text-blue-700 mb-2 flex-grow text-xs line-clamp-2">{level.description}</p>
                 
-                <div className="grid grid-cols-2 gap-2 mb-4">
-                  {/* Difficulty */}
-                  <div className="bg-blue-50 rounded-lg p-2">
-                    <p className="text-xs text-blue-600 mb-1">Difficulty</p>
-                    <div className="flex">
-                      <StarIcon className={`w-4 h-4 ${level.difficulty === "Easy" || level.difficulty === "Medium" || level.difficulty === "Hard" ? "text-yellow-400" : "text-gray-300"}`} />
-                      <StarIcon className={`w-4 h-4 ${level.difficulty === "Medium" || level.difficulty === "Hard" ? "text-yellow-400" : "text-gray-300"}`} />
-                      <StarIcon className={`w-4 h-4 ${level.difficulty === "Hard" ? "text-yellow-400" : "text-gray-300"}`} />
-                    </div>
+                <div className="flex justify-between items-center text-xs mb-2">
+                  <div className="flex">
+                    <StarIcon className={`w-3 h-3 ${level.difficulty === "Easy" || level.difficulty === "Medium" || level.difficulty === "Hard" ? "text-yellow-400" : "text-gray-300"}`} />
+                    <StarIcon className={`w-3 h-3 ${level.difficulty === "Medium" || level.difficulty === "Hard" ? "text-yellow-400" : "text-gray-300"}`} />
+                    <StarIcon className={`w-3 h-3 ${level.difficulty === "Hard" ? "text-yellow-400" : "text-gray-300"}`} />
                   </div>
-                  
-                  {/* Points */}
-                  <div className="bg-blue-50 rounded-lg p-2">
-                    <p className="text-xs text-blue-600 mb-1">Points</p>
-                    <p className="font-bold text-purple-700">{level.points}</p>
-                  </div>
+                  <div className="text-purple-700 font-semibold">{level.points} pts</div>
                 </div>
                 
                 {level.unlocked ? (
-                  <Link href={`/game/play/${level.id}`} className="mt-auto">
-                    <button className="btn-primary w-full py-2 text-sm sm:text-base">
+                  <Link href={`/game/play/${level.id}`}>
+                    <button className="btn-primary w-full py-1.5 text-xs">
                       Play Now
                     </button>
                   </Link>
                 ) : (
-                  <div className="mt-auto">
-                    <button className="bg-gray-200 text-gray-500 py-2 px-4 rounded-full w-full cursor-not-allowed font-bold text-sm sm:text-base">
-                      Locked
-                    </button>
-                    <p className="text-xs text-center text-gray-500 mt-2">Complete previous levels to unlock</p>
-                  </div>
+                  <button className="bg-gray-200 text-gray-500 py-1.5 px-3 rounded-full w-full cursor-not-allowed font-bold text-xs">
+                    Locked
+                  </button>
                 )}
               </div>
             </motion.div>
@@ -254,20 +239,37 @@ export default function LevelsPage() {
         </div>
       </motion.div>
       
-      {/* Navigation buttons */}
-      <div className="container mx-auto mt-8 flex justify-center space-x-4">
-        <Link href="/leaderboard">
-          <button className="btn-secondary flex items-center">
-            <TrophyIcon className="h-5 w-5 mr-2" />
-            Leaderboard
-          </button>
-        </Link>
-        <Link href="/profile">
-          <button className="btn-secondary flex items-center">
-            <UserIcon className="h-5 w-5 mr-2" />
-            Profile
-          </button>
-        </Link>
+      {/* Bottom Tabs Navigation Bar */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white shadow-lg z-30">
+        <div className="flex justify-around items-center">
+          <Link href="/" className="flex-1">
+            <div className="flex flex-col items-center py-3 text-blue-600">
+              <HomeIcon className="w-6 h-6" />
+              <span className="text-xs mt-1">Home</span>
+            </div>
+          </Link>
+          
+          <Link href="/game/levels" className="flex-1">
+            <div className="flex flex-col items-center py-3 text-purple-600 border-t-2 border-purple-600">
+              <PuzzlePieceIcon className="w-6 h-6" />
+              <span className="text-xs mt-1">Levels</span>
+            </div>
+          </Link>
+          
+          <Link href="/leaderboard" className="flex-1">
+            <div className="flex flex-col items-center py-3 text-blue-600">
+              <TrophyIcon className="w-6 h-6" />
+              <span className="text-xs mt-1">Leaderboard</span>
+            </div>
+          </Link>
+          
+          <Link href="/profile" className="flex-1">
+            <div className="flex flex-col items-center py-3 text-blue-600">
+              <UserIcon className="w-6 h-6" />
+              <span className="text-xs mt-1">Profile</span>
+            </div>
+          </Link>
+        </div>
       </div>
     </div>
   );
