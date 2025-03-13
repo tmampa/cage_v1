@@ -40,9 +40,14 @@ const saveLevelProgress = async (userId, levelId, score, passed) => {
 
     // Check if document exists
     const docSnap = await getDoc(progressRef);
+    const isNewHighScore =
+      !docSnap.exists() || (docSnap.exists() && docSnap.data().score < score);
+
     if (docSnap.exists()) {
-      // Update existing document
-      await updateDoc(progressRef, progressData);
+      // Only update if new score is higher
+      if (isNewHighScore) {
+        await updateDoc(progressRef, progressData);
+      }
     } else {
       // Create new document
       await setDoc(progressRef, {
@@ -51,20 +56,47 @@ const saveLevelProgress = async (userId, levelId, score, passed) => {
       });
     }
 
-    // If passed, update user's highest level
-    if (passed) {
-      const userRef = doc(db, 'users', userId);
-      const userDoc = await getDoc(userRef);
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        const currentHighestLevel = userData.highestLevel || 0;
-        if (levelId > currentHighestLevel) {
-          await updateDoc(userRef, {
-            highestLevel: levelId,
-            updatedAt: new Date().toISOString(),
-          });
+    // Update user's total score and highest level in their profile
+    const userRef = doc(db, 'users', userId);
+    const userDoc = await getDoc(userRef);
+
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      let totalScore = userData.score || 0;
+      const currentHighestLevel = userData.highestLevel || 0;
+
+      // If this is a new high score for the level, update the total score
+      if (isNewHighScore) {
+        // If there was a previous score for this level, subtract it
+        if (docSnap.exists()) {
+          totalScore -= docSnap.data().score;
         }
+        // Add the new score
+        totalScore += score;
       }
+
+      // Update user profile with new total score and highest level if applicable
+      await updateDoc(userRef, {
+        score: totalScore,
+        highestLevel: passed
+          ? Math.max(currentHighestLevel, levelId)
+          : currentHighestLevel,
+        updatedAt: new Date().toISOString(),
+      });
+
+      // Update leaderboard
+      const leaderboardRef = doc(db, 'leaderboard', userId);
+      await setDoc(
+        leaderboardRef,
+        {
+          userId,
+          username: userData.username,
+          score: totalScore,
+          avatar_emoji: userData.avatar_emoji || '👤',
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
     }
 
     return true;
