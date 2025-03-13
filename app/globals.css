@@ -1,2 +1,165 @@
 @import "tailwindcss";
 
+/* Fun button style for kids */
+.btn-primary {
+  background-color: #FF9E00; /* Bright orange */
+  color: #FFFFFF;
+  font-weight: bold;
+  border-radius: 2rem;
+  padding: 1rem 2rem;
+  box-shadow: 0 6px 0 #E67700, 0 8px 10px rgba(0, 0, 0, 0.2);
+  font-size: 1.25rem;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  position: relative;
+  top: 0;
+}
+
+.btn-primary:hover {
+  top: -3px;
+  box-shadow: 0 9px 0 #E67700, 0 12px 15px rgba(0, 0, 0, 0.2);
+}
+
+.btn-primary:active {
+  top: 3px;
+  box-shadow: 0 3px 0 #E67700, 0 4px 5px rgba(0, 0, 0, 0.2);
+}
+
+.btn-primary:focus {
+  outline: none;
+  box-shadow: 0 6px 0 #E67700, 0 8px 10px rgba(0, 0, 0, 0.2), 0 0 0 3px rgba(255, 158, 0, 0.4);
+}
+
+/* Secondary button */
+.btn-secondary {
+  background-color: #4ADE80; /* Green */
+  color: #FFFFFF;
+  font-weight: bold;
+  border-radius: 2rem;
+  padding: 1rem 2rem;
+  box-shadow: 0 6px 0 #22C55E, 0 8px 10px rgba(0, 0, 0, 0.2);
+  font-size: 1.25rem;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  position: relative;
+  top: 0;
+}
+
+.btn-secondary:hover {
+  top: -3px;
+  box-shadow: 0 9px 0 #22C55E, 0 12px 15px rgba(0, 0, 0, 0.2);
+}
+
+.btn-secondary:active {
+  top: 3px;
+  box-shadow: 0 3px 0 #22C55E, 0 4px 5px rgba(0, 0, 0, 0.2);
+}
+
+/* Kid-friendly body styles */
+body {
+  font-family: 'Comic Sans MS', 'Chalkboard SE', 'Marker Felt', sans-serif;
+  background-color: #F0F9FF;
+  color: #333333;
+  padding: 0;
+  margin: 0;
+}
+
+/* Card styles */
+.game-card {
+  background-color: white;
+  border-radius: 1.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  overflow: hidden;
+  position: relative;
+}
+
+.game-card:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.game-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: linear-gradient(90deg, #FF9E00, #4ADEEB, #FF6B6B, #4ADEEB, #FF9E00);
+  background-size: 400% 400%;
+  animation: gradient 3s ease infinite;
+}
+
+/* Fun animations */
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+.float {
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.bounce {
+  animation: bounce 2s ease infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.pulse {
+  animation: pulse 2s ease infinite;
+}
+
+@keyframes gradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.gradient-text {
+  background: linear-gradient(90deg, #FF9E00, #FF6B6B, #4ADEEB);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  background-size: 200% auto;
+  animation: gradient-text 4s linear infinite;
+}
+
+@keyframes gradient-text {
+  0% { background-position: 0% center; }
+  100% { background-position: 200% center; }
+}
+
+.bubble {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(1px);
+  z-index: -1;
+}
+
+/* Progress bar */
+.progress-bar {
+  height: 10px;
+  background-color: #E5E7EB;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #4ADEEB, #4ADEEB);
+  transition: width 0.5s ease;
+}
