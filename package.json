@@ -11,7 +11,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.0",
     "@heroicons/react": "^2.2.0",
-    "@supabase/supabase-js": "^2.49.1",
+    "firebase": "^11.4.0",
     "framer-motion": "^12.5.0",
     "next": "15.2.2",
     "react": "^19.0.0",

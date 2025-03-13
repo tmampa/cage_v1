@@ -8,7 +8,7 @@ import {
   UserCircleIcon,
 } from '@heroicons/react/24/solid';
 import { motion } from 'framer-motion';
-import { getLeaderboardData } from '../../utils/gameProgress';
+import { getFirebaseLeaderboardData } from '../../lib/firebase';
 
 export default function LeaderboardPage() {
   // State for leaderboard data
@@ -29,7 +29,7 @@ export default function LeaderboardPage() {
   async function fetchLeaderboardData() {
     try {
       setLoading(true);
-      const data = await getLeaderboardData(timeFilter);
+      const data = await getFirebaseLeaderboardData(timeFilter);
       setLeaderboardData(data);
       setError(null);
     } catch (err) {
