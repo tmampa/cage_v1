@@ -4,56 +4,59 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 // Note: In production, this should be stored in an environment variable
 const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY);
 
+// Simple in-memory cache for generated questions to reduce API calls
+const questionsCache = {};
+
 // Level definitions with their topics and difficulty
 const levelDefinitions = [
   {
     id: 1,
-    title: "Cyber Security Basics",
-    description: "Learn the fundamentals of staying safe online",
-    difficulty: "Easy",
-    topics: ["internet safety", "basic security concepts", "online threats"],
-    questionsCount: 5
+    title: 'Cyber Security Basics',
+    description: 'Learn the fundamentals of staying safe online',
+    difficulty: 'Easy',
+    topics: ['internet safety', 'basic security concepts', 'online threats'],
+    questionsCount: 5,
   },
   {
     id: 2,
-    title: "Password Protection",
-    description: "Create strong passwords and keep them safe",
-    difficulty: "Easy",
-    topics: ["password strength", "password managers", "credential security"],
-    questionsCount: 6
+    title: 'Password Protection',
+    description: 'Create strong passwords and keep them safe',
+    difficulty: 'Easy',
+    topics: ['password strength', 'password managers', 'credential security'],
+    questionsCount: 6,
   },
   {
     id: 3,
-    title: "Phishing Attacks",
-    description: "Identify and avoid dangerous emails and messages",
-    difficulty: "Medium",
-    topics: ["phishing emails", "social engineering", "suspicious links"],
-    questionsCount: 7
+    title: 'Phishing Attacks',
+    description: 'Identify and avoid dangerous emails and messages',
+    difficulty: 'Medium',
+    topics: ['phishing emails', 'social engineering', 'suspicious links'],
+    questionsCount: 7,
   },
   {
     id: 4,
-    title: "Safe Web Browsing",
-    description: "Navigate the internet safely and avoid threats",
-    difficulty: "Medium",
-    topics: ["browser security", "safe websites", "download safety"],
-    questionsCount: 8
+    title: 'Safe Web Browsing',
+    description: 'Navigate the internet safely and avoid threats',
+    difficulty: 'Medium',
+    topics: ['browser security', 'safe websites', 'download safety'],
+    questionsCount: 8,
   },
   {
     id: 5,
-    title: "Social Media Safety",
-    description: "Protect your personal information on social platforms",
-    difficulty: "Hard", 
-    topics: ["privacy settings", "information sharing", "social media scams"],
-    questionsCount: 9
+    title: 'Social Media Safety',
+    description: 'Protect your personal information on social platforms',
+    difficulty: 'Hard',
+    topics: ['privacy settings', 'information sharing', 'social media scams'],
+    questionsCount: 9,
   },
   {
     id: 6,
-    title: "Malware Defense",
-    description: "Understand and protect against computer viruses",
-    difficulty: "Hard",
-    topics: ["malware types", "virus protection", "infection prevention"],
-    questionsCount: 10
-  }
+    title: 'Malware Defense',
+    description: 'Understand and protect against computer viruses',
+    difficulty: 'Hard',
+    topics: ['malware types', 'virus protection', 'infection prevention'],
+    questionsCount: 10,
+  },
 ];
 
 /**
@@ -63,9 +66,9 @@ const levelDefinitions = [
  */
 function createPromptForLevel(level) {
   const difficulty = level.difficulty.toLowerCase();
-  const topics = level.topics.join(", ");
+  const topics = level.topics.join(', ');
   const count = level.questionsCount;
-  
+
   return `
   Generate ${count} multiple-choice questions about ${topics} for everyone learning about cyber security.
   
@@ -104,74 +107,94 @@ function shuffleQuestionOptions(question) {
   // Create pairs of options and their indices
   const pairs = question.options.map((option, index) => ({
     option,
-    isCorrect: index === question.correctIndex
+    isCorrect: index === question.correctIndex,
   }));
-  
+
   // Shuffle the pairs
   for (let i = pairs.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [pairs[i], pairs[j]] = [pairs[j], pairs[i]];
   }
-  
+
   // Update the question object
-  question.options = pairs.map(p => p.option);
-  question.correctIndex = pairs.findIndex(p => p.isCorrect);
-  
+  question.options = pairs.map((p) => p.option);
+  question.correctIndex = pairs.findIndex((p) => p.isCorrect);
+
   return question;
 }
 
 /**
  * Generates questions for a specific level using Gemini
- * @param {Object} level - The level definition
+ * @param {number} levelId - The level ID
  * @returns {Promise<Array>} - Array of question objects
  */
 export async function generateQuestionsForLevel(levelId) {
   try {
-    const level = levelDefinitions.find(l => l.id === levelId);
-    
+    console.log(`Generating questions for level ${levelId}`);
+
+    // Check if questions are already in cache
+    if (questionsCache[levelId]) {
+      console.log(`Using cached questions for level ${levelId}`);
+      return questionsCache[levelId];
+    }
+
+    const level = levelDefinitions.find((l) => l.id === levelId);
+
     if (!level) {
       throw new Error(`Level with ID ${levelId} not found`);
     }
-    
+
+    // Check if the API key is available
+    if (!process.env.NEXT_PUBLIC_GEMINI_API_KEY) {
+      console.warn('Gemini API key not found. Cannot generate questions.');
+      throw new Error('Gemini API key not configured');
+    }
+
     // Generate the prompt
     const prompt = createPromptForLevel(level);
-    
+
     // Get the Gemini model
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-    
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+
     // Generate content
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
-    
+
     // Parse the JSON response
     try {
       // Clean the response if it contains markdown code blocks
       let cleanedText = text;
-      
+
       // Remove markdown code block syntax if present
       if (text.includes('```json')) {
         cleanedText = text.replace(/```json\n|\n```/g, '');
       } else if (text.includes('```')) {
         cleanedText = text.replace(/```\n|\n```/g, '');
       }
-      
+
       // Trim any whitespace
       cleanedText = cleanedText.trim();
-      
+
       const questions = JSON.parse(cleanedText);
-      
+
       // Shuffle the options for each question to further randomize correct answers
-      const shuffledQuestions = questions.map(q => shuffleQuestionOptions(q));
-      
+      const shuffledQuestions = questions.map((q) => shuffleQuestionOptions(q));
+
+      // Store in cache
+      questionsCache[levelId] = shuffledQuestions;
+
+      console.log(
+        `Successfully generated ${shuffledQuestions.length} questions for level ${levelId}`
+      );
       return shuffledQuestions;
     } catch (e) {
-      console.error("Failed to parse Gemini response as JSON:", e);
-      console.log("Raw response:", text);
-      throw new Error("Invalid response format from Gemini");
+      console.error('Failed to parse Gemini response as JSON:', e);
+      console.log('Raw response:', text);
+      throw new Error('Failed to parse AI response');
     }
   } catch (error) {
-    console.error("Error generating questions:", error);
+    console.error(`Error generating questions for level ${levelId}:`, error);
     throw error;
   }
 }
@@ -182,18 +205,24 @@ export async function generateQuestionsForLevel(levelId) {
  */
 export async function generateAllLevelQuestions() {
   const allQuestions = {};
-  
+
   for (const level of levelDefinitions) {
     try {
       const questions = await generateQuestionsForLevel(level.id);
       allQuestions[level.id] = questions;
-      console.log(`Generated ${questions.length} questions for level ${level.id}`);
+      console.log(
+        `Generated ${questions.length} questions for level ${level.id}`
+      );
     } catch (error) {
-      console.error(`Failed to generate questions for level ${level.id}:`, error);
-      allQuestions[level.id] = []; // Empty array for failed levels
+      console.error(
+        `Failed to generate questions for level ${level.id}:`,
+        error
+      );
+      // No default questions, just use an empty array
+      allQuestions[level.id] = [];
     }
   }
-  
+
   return allQuestions;
 }
 
@@ -203,4 +232,14 @@ export async function generateAllLevelQuestions() {
  */
 export function getLevelDefinitions() {
   return levelDefinitions;
+}
+
+/**
+ * Clear the questions cache
+ */
+export function clearQuestionsCache() {
+  Object.keys(questionsCache).forEach((key) => {
+    delete questionsCache[key];
+  });
+  console.log('Questions cache cleared');
 }
