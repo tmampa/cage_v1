@@ -1,11 +1,39 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Initialize the Gemini API with your API key
-// Note: In production, this should be stored in an environment variable
 const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY);
 
+// Get cached questions from local storage if available
+const loadQuestionsFromStorage = () => {
+  if (typeof window !== 'undefined') {
+    try {
+      const cachedData = localStorage.getItem('cage_questions_cache');
+      return cachedData ? JSON.parse(cachedData) : {};
+    } catch (e) {
+      console.error('Error loading questions from localStorage:', e);
+      return {};
+    }
+  }
+  return {};
+};
+
+// Save questions to local storage
+const saveQuestionsToStorage = (cache) => {
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem('cage_questions_cache', JSON.stringify(cache));
+    } catch (e) {
+      console.error('Error saving questions to localStorage:', e);
+    }
+  }
+};
+
 // Simple in-memory cache for generated questions to reduce API calls
-const questionsCache = {};
+// Initialize with any cached data from localStorage
+const questionsCache = loadQuestionsFromStorage();
+
+// Track pending requests to prevent duplicate API calls
+const pendingRequests = {};
 
 // Level definitions with their topics and difficulty
 const levelDefinitions = [
@@ -132,13 +160,22 @@ export async function generateQuestionsForLevel(levelId) {
   try {
     console.log(`Generating questions for level ${levelId}`);
 
+    // Convert levelId to string for use as object key
+    const cacheKey = String(levelId);
+
     // Check if questions are already in cache
-    if (questionsCache[levelId]) {
+    if (questionsCache[cacheKey]) {
       console.log(`Using cached questions for level ${levelId}`);
-      return questionsCache[levelId];
+      return [...questionsCache[cacheKey]]; // Return a copy to prevent mutations
     }
 
-    const level = levelDefinitions.find((l) => l.id === levelId);
+    // Check if there's already a pending request for this level
+    if (pendingRequests[cacheKey]) {
+      console.log(`Using existing pending request for level ${levelId}`);
+      return pendingRequests[cacheKey];
+    }
+
+    const level = levelDefinitions.find((l) => l.id === parseInt(levelId));
 
     if (!level) {
       throw new Error(`Level with ID ${levelId} not found`);
@@ -150,51 +187,67 @@ export async function generateQuestionsForLevel(levelId) {
       throw new Error('Gemini API key not configured');
     }
 
-    // Generate the prompt
-    const prompt = createPromptForLevel(level);
+    // Create a promise for this request and store it
+    pendingRequests[cacheKey] = (async () => {
+      try {
+        // Generate the prompt
+        const prompt = createPromptForLevel(level);
 
-    // Get the Gemini model
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        // Get the Gemini model
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-    // Generate content
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+        // Generate content
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
 
-    // Parse the JSON response
-    try {
-      // Clean the response if it contains markdown code blocks
-      let cleanedText = text;
+        // Clean the response if it contains markdown code blocks
+        let cleanedText = text;
 
-      // Remove markdown code block syntax if present
-      if (text.includes('```json')) {
-        cleanedText = text.replace(/```json\n|\n```/g, '');
-      } else if (text.includes('```')) {
-        cleanedText = text.replace(/```\n|\n```/g, '');
+        // Remove markdown code block syntax if present
+        if (text.includes('```json')) {
+          cleanedText = text.replace(/```json\n|\n```/g, '');
+        } else if (text.includes('```')) {
+          cleanedText = text.replace(/```\n|\n```/g, '');
+        }
+
+        // Trim any whitespace
+        cleanedText = cleanedText.trim();
+
+        const questions = JSON.parse(cleanedText);
+
+        // Shuffle the options for each question to further randomize correct answers
+        const shuffledQuestions = questions.map((q) =>
+          shuffleQuestionOptions(q)
+        );
+
+        // Store in cache with metadata
+        questionsCache[cacheKey] = shuffledQuestions;
+
+        // Persist to localStorage
+        saveQuestionsToStorage(questionsCache);
+
+        console.log(
+          `Successfully generated ${shuffledQuestions.length} questions for level ${levelId}`
+        );
+
+        // Return a copy of the questions to prevent mutations
+        return [...shuffledQuestions];
+      } catch (e) {
+        console.error('Error generating questions:', e);
+        throw e;
+      } finally {
+        // Clean up the pending request
+        delete pendingRequests[cacheKey];
       }
+    })();
 
-      // Trim any whitespace
-      cleanedText = cleanedText.trim();
-
-      const questions = JSON.parse(cleanedText);
-
-      // Shuffle the options for each question to further randomize correct answers
-      const shuffledQuestions = questions.map((q) => shuffleQuestionOptions(q));
-
-      // Store in cache
-      questionsCache[levelId] = shuffledQuestions;
-
-      console.log(
-        `Successfully generated ${shuffledQuestions.length} questions for level ${levelId}`
-      );
-      return shuffledQuestions;
-    } catch (e) {
-      console.error('Failed to parse Gemini response as JSON:', e);
-      console.log('Raw response:', text);
-      throw new Error('Failed to parse AI response');
-    }
+    return pendingRequests[cacheKey];
   } catch (error) {
-    console.error(`Error generating questions for level ${levelId}:`, error);
+    console.error(
+      `Error in question generation flow for level ${levelId}:`,
+      error
+    );
     throw error;
   }
 }
@@ -218,7 +271,6 @@ export async function generateAllLevelQuestions() {
         `Failed to generate questions for level ${level.id}:`,
         error
       );
-      // No default questions, just use an empty array
       allQuestions[level.id] = [];
     }
   }
@@ -241,5 +293,11 @@ export function clearQuestionsCache() {
   Object.keys(questionsCache).forEach((key) => {
     delete questionsCache[key];
   });
+
+  // Also clear localStorage cache
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('cage_questions_cache');
+  }
+
   console.log('Questions cache cleared');
 }
