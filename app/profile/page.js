@@ -110,6 +110,21 @@ function ProfilePage() {
     }
   };
 
+  const formatJoinedDate = (dateValue) => {
+    try {
+      // Handle Firebase Timestamp objects
+      if (dateValue && typeof dateValue === 'object' && dateValue.toDate) {
+        return dateValue.toDate().toLocaleDateString();
+      }
+
+      // Handle ISO strings or other date formats
+      return new Date(dateValue).toLocaleDateString();
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Recently joined';
+    }
+  };
+
   if (!user || !userProfile) {
     return (
       <div className='min-h-screen bg-gradient-to-b from-blue-300 to-purple-300 flex items-center justify-center'>
@@ -221,7 +236,9 @@ function ProfilePage() {
                 <span className='text-sm'>Joined</span>
               </div>
               <p className='text-sm text-purple-700'>
-                {new Date(userProfile.created_at).toLocaleDateString()}
+                {userProfile.created_at
+                  ? formatJoinedDate(userProfile.created_at)
+                  : 'Recently joined'}
               </p>
             </div>
           </div>
