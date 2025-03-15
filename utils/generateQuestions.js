@@ -3,35 +3,6 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 // Initialize the Gemini API with your API key
 const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY);
 
-// Get cached questions from local storage if available
-const loadQuestionsFromStorage = () => {
-  if (typeof window !== 'undefined') {
-    try {
-      const cachedData = localStorage.getItem('cage_questions_cache');
-      return cachedData ? JSON.parse(cachedData) : {};
-    } catch (e) {
-      console.error('Error loading questions from localStorage:', e);
-      return {};
-    }
-  }
-  return {};
-};
-
-// Save questions to local storage
-const saveQuestionsToStorage = (cache) => {
-  if (typeof window !== 'undefined') {
-    try {
-      localStorage.setItem('cage_questions_cache', JSON.stringify(cache));
-    } catch (e) {
-      console.error('Error saving questions to localStorage:', e);
-    }
-  }
-};
-
-// Simple in-memory cache for generated questions to reduce API calls
-// Initialize with any cached data from localStorage
-const questionsCache = loadQuestionsFromStorage();
-
 // Track pending requests to prevent duplicate API calls
 const pendingRequests = {};
 
@@ -96,25 +67,33 @@ function createPromptForLevel(level) {
   const difficulty = level.difficulty.toLowerCase();
   const topics = level.topics.join(', ');
   const count = level.questionsCount;
+  const levelId = level.id;
+  const levelTitle = level.title;
 
   return `
-  Generate ${count} multiple-choice questions about ${topics} for everyone learning about cyber security.
+  Generate ${count} unique multiple-choice questions about ${topics} for Level ${levelId}: "${levelTitle}" in a cyber security educational game.
   
-  These questions should be at a ${difficulty} difficulty level suitable for everyone.
+  These questions should be at a ${difficulty} difficulty level suitable for general audiences.
+  
+  Level ${levelId} is about "${levelTitle}", so focus specifically on ${topics}.
+  
+  The questions should be completely different from any questions in other levels of the game,
+  with no overlap or similarity in content between this level and others.
   
   For each question:
   1. Make the language simple and friendly
   2. Provide one correct answer and three incorrect answers
   3. Include a brief explanation why the correct answer is right
   4. The incorrect answers should be plausible but clearly wrong
-  5. Keep the questions practical and relevant to everyone's everyday online activities
+  5. Keep the questions practical and relevant to everyday online activities
   6. IMPORTANT: Randomize which option (A, B, C, or D) is the correct answer for each question
   7. DO NOT make the first option (A) the correct answer for most or all questions
+  8. Each question should be uniquely focused on the topics for Level ${levelId}
   
   Format your response as a JSON array of objects with the following structure:
   [
     {
-      "question": "The question text",
+      "question": "The question text related to ${topics}",
       "options": ["Option A", "Option B", "Option C", "Option D"],
       "correctIndex": 0,  // Index of the correct answer (0-3)
       "explanation": "Why this answer is correct"
@@ -158,16 +137,10 @@ function shuffleQuestionOptions(question) {
  */
 export async function generateQuestionsForLevel(levelId) {
   try {
-    console.log(`Generating questions for level ${levelId}`);
+    // Convert levelId to string for consistent use as object key
+    const cacheKey = `level_${levelId}`;
 
-    // Convert levelId to string for use as object key
-    const cacheKey = String(levelId);
-
-    // Check if questions are already in cache
-    if (questionsCache[cacheKey]) {
-      console.log(`Using cached questions for level ${levelId}`);
-      return [...questionsCache[cacheKey]]; // Return a copy to prevent mutations
-    }
+    console.log(`Generating fresh questions for level ${levelId}`);
 
     // Check if there's already a pending request for this level
     if (pendingRequests[cacheKey]) {
@@ -193,13 +166,28 @@ export async function generateQuestionsForLevel(levelId) {
         // Generate the prompt
         const prompt = createPromptForLevel(level);
 
-        // Get the Gemini model
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        console.log(
+          `Generated prompt for level ${levelId}, length: ${prompt.length}`
+        );
+
+        // Get the Gemini model - using a more capable model
+        const model = genAI.getGenerativeModel({
+          model: 'gemini-1.5-pro',
+          generationConfig: {
+            temperature: 0.7, // Add some randomness
+            topP: 0.9,
+            topK: 40,
+          },
+        });
 
         // Generate content
         const result = await model.generateContent(prompt);
         const response = await result.response;
         const text = response.text();
+
+        console.log(
+          `Received response from Gemini for level ${levelId}, length: ${text.length}`
+        );
 
         // Clean the response if it contains markdown code blocks
         let cleanedText = text;
@@ -214,27 +202,40 @@ export async function generateQuestionsForLevel(levelId) {
         // Trim any whitespace
         cleanedText = cleanedText.trim();
 
-        const questions = JSON.parse(cleanedText);
+        // Try to parse the JSON response
+        let questions;
+        try {
+          questions = JSON.parse(cleanedText);
+        } catch (jsonError) {
+          console.error(`JSON parse error for level ${levelId}:`, jsonError);
+          console.log('Raw response:', text);
+          throw new Error('Failed to parse AI response');
+        }
+
+        // Validate questions structure
+        if (!Array.isArray(questions) || questions.length === 0) {
+          throw new Error(`Invalid questions format for level ${levelId}`);
+        }
 
         // Shuffle the options for each question to further randomize correct answers
         const shuffledQuestions = questions.map((q) =>
           shuffleQuestionOptions(q)
         );
 
-        // Store in cache with metadata
-        questionsCache[cacheKey] = shuffledQuestions;
-
-        // Persist to localStorage
-        saveQuestionsToStorage(questionsCache);
+        // Add level ID to each question
+        const finalQuestions = shuffledQuestions.map((q) => ({
+          ...q,
+          levelId: parseInt(levelId),
+        }));
 
         console.log(
-          `Successfully generated ${shuffledQuestions.length} questions for level ${levelId}`
+          `Successfully generated ${finalQuestions.length} fresh questions for level ${levelId}`
         );
 
-        // Return a copy of the questions to prevent mutations
-        return [...shuffledQuestions];
+        // Return a deep copy of the questions to prevent mutations
+        return JSON.parse(JSON.stringify(finalQuestions));
       } catch (e) {
-        console.error('Error generating questions:', e);
+        console.error(`Error generating questions for level ${levelId}:`, e);
         throw e;
       } finally {
         // Clean up the pending request
@@ -259,6 +260,7 @@ export async function generateQuestionsForLevel(levelId) {
 export async function generateAllLevelQuestions() {
   const allQuestions = {};
 
+  // Process levels sequentially to avoid overwhelming the API
   for (const level of levelDefinitions) {
     try {
       const questions = await generateQuestionsForLevel(level.id);
@@ -266,6 +268,9 @@ export async function generateAllLevelQuestions() {
       console.log(
         `Generated ${questions.length} questions for level ${level.id}`
       );
+
+      // Add a small delay between requests to avoid rate limits
+      await new Promise((resolve) => setTimeout(resolve, 2000));
     } catch (error) {
       console.error(
         `Failed to generate questions for level ${level.id}:`,
@@ -284,20 +289,4 @@ export async function generateAllLevelQuestions() {
  */
 export function getLevelDefinitions() {
   return levelDefinitions;
-}
-
-/**
- * Clear the questions cache
- */
-export function clearQuestionsCache() {
-  Object.keys(questionsCache).forEach((key) => {
-    delete questionsCache[key];
-  });
-
-  // Also clear localStorage cache
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem('cage_questions_cache');
-  }
-
-  console.log('Questions cache cleared');
 }
