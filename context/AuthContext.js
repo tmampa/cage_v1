@@ -130,8 +130,8 @@ export function AuthProvider({ children }) {
       await fetchUserProfile(authUser.uid, userData);
       return authUser;
     } catch (error) {
-      console.error('Register error:', error);
-      throw error;
+      console.error('Error signing up:', error.code, error.message);
+      return { user: null, error: error.message };
     }
   };
 
