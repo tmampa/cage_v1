@@ -146,7 +146,7 @@ function ProfilePage() {
       <div className='container mx-auto p-4'>
         <div className='flex justify-between items-center mb-6'>
           <Link
-            href='/'
+            href='/game/levels'
             className='inline-flex items-center text-blue-700 hover:text-blue-900'
           >
             <ArrowLeftIcon className='w-5 h-5 mr-2' />
@@ -345,7 +345,7 @@ function ProfilePage() {
       {/* Bottom navigation */}
       <div className='fixed bottom-0 left-0 right-0 bg-white shadow-lg z-30'>
         <div className='flex justify-around items-center'>
-          <Link href='/' className='flex-1'>
+          <Link href='/game/levels' className='flex-1'>
             <div className='flex flex-col items-center py-3 text-blue-600'>
               <HomeIcon className='w-6 h-6' />
               <span className='text-xs mt-1'>Home</span>

@@ -391,7 +391,7 @@ export default function LevelsPage() {
       {/* Bottom Tabs Navigation Bar */}
       <div className='fixed bottom-0 left-0 right-0 bg-white shadow-lg z-30'>
         <div className='flex justify-around items-center'>
-          <Link href='/' className='flex-1'>
+          <Link href='/game/levels' className='flex-1'>
             <div className='flex flex-col items-center py-3 text-blue-600'>
               <HomeIcon className='w-6 h-6' />
               <span className='text-xs mt-1'>Home</span>
