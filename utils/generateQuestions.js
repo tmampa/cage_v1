@@ -172,7 +172,7 @@ export async function generateQuestionsForLevel(levelId) {
 
         // Get the Gemini model - using a more capable model
         const model = genAI.getGenerativeModel({
-          model: 'gemini-1.5-pro',
+          model: 'gemini-2.0-flash',
           generationConfig: {
             temperature: 0.7, // Add some randomness
             topP: 0.9,
