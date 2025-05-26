@@ -147,7 +147,6 @@ export default function GameplayPage({ params }) {
   const [levelComplete, setLevelComplete] = useState(false);
   const [isAnswerCorrect, setIsAnswerCorrect] = useState(null);
   const [generatingQuestions, setGeneratingQuestions] = useState(true);
-  const [usingAIQuestions, setUsingAIQuestions] = useState(false);
 
   // Ref for the timer
   const timerRef = React.useRef(null);
@@ -207,83 +206,16 @@ export default function GameplayPage({ params }) {
           // Generate AI questions
           const generatedQuestions = await generateQuestionsForLevel(levelId);
           setQuestions(generatedQuestions);
-          setUsingAIQuestions(true);
 
           console.log(
             `Generated ${generatedQuestions.length} AI questions for level ${levelId}`
           );
         } catch (error) {
-          console.log(
-            'Could not generate AI questions, falling back to default questions:',
+          console.error(
+            'Failed to generate AI questions for level:',
             error
           );
-
-          // Fallback to default questions
-          const defaultQuestions = [
-            {
-              question: 'What is a strong password?',
-              options: [
-                'Your name and birthday',
-                "A single word like 'password'",
-                'A mix of letters, numbers, and symbols',
-                'The same password you use everywhere',
-              ],
-              correctIndex: 2,
-              explanation:
-                'Strong passwords use a combination of uppercase and lowercase letters, numbers, and special characters. They should be at least 12 characters long and not contain personal information.',
-            },
-            {
-              question:
-                'What should you do if you receive an email asking for your password?',
-              options: [
-                'Reply with your password',
-                'Click on any links in the email',
-                'Ignore it and delete the email',
-                'Share the email with friends',
-              ],
-              correctIndex: 2,
-              explanation:
-                'Legitimate organizations will never ask for your password via email. These are phishing attempts to steal your information.',
-            },
-            {
-              question: 'What is two-factor authentication?',
-              options: [
-                'Using two different passwords',
-                'Using something you know and something you have',
-                'Sharing your password with two friends',
-                'Logging in twice',
-              ],
-              correctIndex: 1,
-              explanation:
-                'Two-factor authentication adds an extra layer of security by requiring both something you know (password) and something you have (like a code sent to your phone).',
-            },
-            {
-              question: 'Which of these is a sign of a secure website?',
-              options: [
-                'A padlock icon in the address bar',
-                'Lots of pop-up advertisements',
-                "URLs that start with 'http://'",
-                'Requests for personal information',
-              ],
-              correctIndex: 0,
-              explanation:
-                'Secure websites use HTTPS encryption, shown by a padlock icon in the address bar. This means your data is encrypted when sent to that site.',
-            },
-            {
-              question: 'What is malware?',
-              options: [
-                'A type of computer hardware',
-                'Software that protects your computer',
-                'Harmful software designed to damage or gain unauthorized access',
-                'A type of strong password',
-              ],
-              correctIndex: 2,
-              explanation:
-                'Malware (malicious software) includes viruses, worms, trojans, and ransomware that can harm your device or steal your information.',
-            },
-          ];
-          setQuestions(defaultQuestions);
-          setUsingAIQuestions(false);
+          throw new Error(`Failed to generate questions: ${error.message}. No fallback questions available.`);
         }
 
         setCurrentQuestionIndex(0);
@@ -500,7 +432,7 @@ export default function GameplayPage({ params }) {
             No Questions Available
           </h2>
           <p className='text-blue-700 mb-6'>
-            We couldn't load the questions for this level.
+            We couldn't generate questions for this level. Fallback questions have been removed from the system.
           </p>
           <Link href='/game/levels'>
             <button className='btn-primary'>Back to Levels</button>

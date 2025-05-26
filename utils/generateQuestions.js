@@ -1,3 +1,7 @@
+// Question Generation System - No Fallback Questions
+// This system generates all questions dynamically using AI (Gemini).
+// Fallback questions have been intentionally removed to ensure all questions are unique and AI-generated.
+
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Initialize the Gemini API with your API key
@@ -142,6 +146,8 @@ function shuffleQuestionOptions(question) {
 
 /**
  * Generates questions for a specific level using Gemini
+ * NOTE: Fallback questions have been intentionally removed from this system.
+ * All questions are generated dynamically using AI to ensure uniqueness and quality.
  * @param {number} levelId - The level ID
  * @returns {Promise<Array>} - Array of question objects
  */
@@ -166,7 +172,7 @@ export async function generateQuestionsForLevel(levelId) {
     // Check if the API key is available
     if (!process.env.NEXT_PUBLIC_GEMINI_API_KEY) {
       console.warn('Gemini API key not found. Cannot generate questions.');
-      throw new Error('Gemini API key not configured');
+      throw new Error('Gemini API key not configured - no fallback questions available');
     }
 
     // Create a promise for this request and store it
@@ -213,12 +219,17 @@ export async function generateQuestionsForLevel(levelId) {
         } catch (jsonError) {
           console.error(`JSON parse error for level ${levelId}:`, jsonError);
           console.log('Raw response:', text);
-          throw new Error('Failed to parse AI response');
+          throw new Error(`Failed to parse AI response for level ${levelId} - no fallback questions available`);
         }
 
         // Validate questions structure
         if (!Array.isArray(questions) || questions.length === 0) {
-          throw new Error(`Invalid questions format for level ${levelId}`);
+          throw new Error(`Invalid questions format for level ${levelId} - no fallback available`);
+        }
+
+        // Ensure we have the expected number of questions
+        if (questions.length < level.questionsCount) {
+          throw new Error(`Insufficient questions generated for level ${levelId}. Expected ${level.questionsCount}, got ${questions.length} - no fallback available`);
         }
 
         // Shuffle the options for each question to further randomize correct answers
@@ -240,7 +251,8 @@ export async function generateQuestionsForLevel(levelId) {
         return JSON.parse(JSON.stringify(validatedQuestions));
       } catch (e) {
         console.error(`Error generating questions for level ${levelId}:`, e);
-        throw e;
+        // No fallback questions - fail immediately
+        throw new Error(`Question generation failed for level ${levelId}: ${e.message}. No fallback questions available.`);
       } finally {
         delete pendingRequests[cacheKey];
       }
@@ -249,7 +261,8 @@ export async function generateQuestionsForLevel(levelId) {
     return pendingRequests[cacheKey];
   } catch (error) {
     console.error(`Error in question generation flow for level ${levelId}:`, error);
-    throw error;
+    // No fallback system - propagate error immediately
+    throw new Error(`Question generation failed for level ${levelId}: ${error.message}. No fallback questions available.`);
   }
 }
 
@@ -276,7 +289,8 @@ export async function generateAllLevelQuestions() {
         `Failed to generate questions for level ${level.id}:`,
         error
       );
-      allQuestions[level.id] = [];
+      // No fallback - let the error propagate
+      throw new Error(`Question generation failed for level ${level.id}: ${error.message}`);
     }
   }
 
