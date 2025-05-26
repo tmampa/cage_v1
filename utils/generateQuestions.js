@@ -13,24 +13,27 @@ const levelDefinitions = [
     title: 'Cyber Security Basics',
     description: 'Learn the fundamentals of staying safe online',
     difficulty: 'Easy',
-    topics: ['internet safety', 'basic security concepts', 'online threats'],
+    topics: ['basic internet safety', 'digital citizenship', 'online privacy fundamentals'],
     questionsCount: 5,
+    focusAreas: ['what is cyber security', 'basic online threats', 'digital footprints']
   },
   {
     id: 2,
     title: 'Password Protection',
     description: 'Create strong passwords and keep them safe',
     difficulty: 'Easy',
-    topics: ['password strength', 'password managers', 'credential security'],
+    topics: ['password strength', 'password managers', 'credential security', 'two-factor authentication'],
     questionsCount: 6,
+    focusAreas: ['creating strong passwords', 'password storage', 'authentication methods']
   },
   {
     id: 3,
     title: 'Phishing Attacks',
     description: 'Identify and avoid dangerous emails and messages',
     difficulty: 'Medium',
-    topics: ['phishing emails', 'social engineering', 'suspicious links'],
+    topics: ['phishing emails', 'suspicious links', 'social engineering tactics', 'email scams'],
     questionsCount: 7,
+    focusAreas: ['recognizing phishing emails', 'suspicious website indicators', 'social engineering red flags']
   },
   {
     id: 4,
@@ -71,37 +74,44 @@ function createPromptForLevel(level) {
   const levelTitle = level.title;
 
   return `
-  Generate ${count} unique multiple-choice questions about ${topics} for Level ${levelId}: "${levelTitle}" in a cyber security educational game.
+  You are creating questions for LEVEL ${levelId} ONLY: "${levelTitle}".
   
-  These questions should be at a ${difficulty} difficulty level suitable for general audiences.
+  CRITICAL: These questions must be COMPLETELY DIFFERENT from questions in other levels.
   
-  Level ${levelId} is about "${levelTitle}", so focus specifically on ${topics}.
+  Generate ${count} unique multiple-choice questions EXCLUSIVELY about ${topics}.
   
-  The questions should be completely different from any questions in other levels of the game,
-  with no overlap or similarity in content between this level and others.
+  LEVEL-SPECIFIC REQUIREMENTS:
+  - Level 1 (Cyber Security Basics): Focus on general internet safety, basic security concepts
+  - Level 2 (Password Protection): Focus ONLY on passwords, password managers, credential security
+  - Level 3 (Phishing Attacks): Focus ONLY on phishing emails, suspicious links, social engineering
+  - Level 4 (Safe Web Browsing): Focus ONLY on browser security, safe websites, download safety
+  - Level 5 (Social Media Safety): Focus ONLY on privacy settings, information sharing, social media scams
+  - Level 6 (Malware Defense): Focus ONLY on malware types, virus protection, infection prevention
   
-  For each question:
-  1. Make the language simple and friendly
-  2. Provide one correct answer and three incorrect answers
-  3. Include a brief explanation why the correct answer is right
-  4. The incorrect answers should be plausible but clearly wrong
-  5. Keep the questions practical and relevant to everyday online activities
-  6. IMPORTANT: Randomize which option (A, B, C, or D) is the correct answer for each question
-  7. DO NOT make the first option (A) the correct answer for most or all questions
-  8. Each question should be uniquely focused on the topics for Level ${levelId}
+  For Level ${levelId} ("${levelTitle}"), create questions that are:
+  1. EXCLUSIVELY about ${topics}
+  2. At ${difficulty} difficulty level
+  3. NEVER overlap with content from other levels
+  4. Completely unique and specific to this level's theme
+  5. Include real-world scenarios related to ${topics}
   
-  Format your response as a JSON array of objects with the following structure:
+  STRICT REQUIREMENTS:
+  - Make each question scenario-based and practical
+  - Ensure correct answers are randomly distributed across A, B, C, D options
+  - Include detailed explanations
+  - NO generic cyber security questions - be specific to ${topics}
+  
+  Format as JSON array:
   [
     {
-      "question": "The question text related to ${topics}",
+      "question": "Specific scenario about ${topics}",
       "options": ["Option A", "Option B", "Option C", "Option D"],
-      "correctIndex": 0,  // Index of the correct answer (0-3)
-      "explanation": "Why this answer is correct"
-    },
-    // more questions...
+      "correctIndex": 0-3,
+      "explanation": "Detailed explanation specific to ${topics}"
+    }
   ]
   
-  Only return the JSON, with no additional text before or after.
+  REMEMBER: This is Level ${levelId} about ${topics} ONLY. Do not include content from other levels.
   `;
 }
 
@@ -137,8 +147,7 @@ function shuffleQuestionOptions(question) {
  */
 export async function generateQuestionsForLevel(levelId) {
   try {
-    // Convert levelId to string for consistent use as object key
-    const cacheKey = `level_${levelId}`;
+    const cacheKey = `level_${levelId}_${Date.now()}`; // Add timestamp for uniqueness
 
     console.log(`Generating fresh questions for level ${levelId}`);
 
@@ -163,24 +172,19 @@ export async function generateQuestionsForLevel(levelId) {
     // Create a promise for this request and store it
     pendingRequests[cacheKey] = (async () => {
       try {
-        // Generate the prompt
         const prompt = createPromptForLevel(level);
 
-        console.log(
-          `Generated prompt for level ${levelId}, length: ${prompt.length}`
-        );
-
-        // Get the Gemini model - using a more capable model
+        // Add more randomization to the model config
         const model = genAI.getGenerativeModel({
           model: 'gemini-2.0-flash',
           generationConfig: {
-            temperature: 0.7, // Add some randomness
-            topP: 0.9,
+            temperature: 0.9, // Increase for more randomness
+            topP: 0.95,
             topK: 40,
+            maxOutputTokens: 2048,
           },
         });
 
-        // Generate content
         const result = await model.generateContent(prompt);
         const response = await result.response;
         const text = response.text();
@@ -228,27 +232,23 @@ export async function generateQuestionsForLevel(levelId) {
           levelId: parseInt(levelId),
         }));
 
-        console.log(
-          `Successfully generated ${finalQuestions.length} fresh questions for level ${levelId}`
-        );
+        // Validate question uniqueness
+        const validatedQuestions = validateQuestionUniqueness(finalQuestions, levelId);
 
-        // Return a deep copy of the questions to prevent mutations
-        return JSON.parse(JSON.stringify(finalQuestions));
+        console.log(`Successfully generated ${validatedQuestions.length} fresh questions for level ${levelId}`);
+        
+        return JSON.parse(JSON.stringify(validatedQuestions));
       } catch (e) {
         console.error(`Error generating questions for level ${levelId}:`, e);
         throw e;
       } finally {
-        // Clean up the pending request
         delete pendingRequests[cacheKey];
       }
     })();
 
     return pendingRequests[cacheKey];
   } catch (error) {
-    console.error(
-      `Error in question generation flow for level ${levelId}:`,
-      error
-    );
+    console.error(`Error in question generation flow for level ${levelId}:`, error);
     throw error;
   }
 }
@@ -289,4 +289,24 @@ export async function generateAllLevelQuestions() {
  */
 export function getLevelDefinitions() {
   return levelDefinitions;
+}
+
+// Add this validation function
+function validateQuestionUniqueness(questions, levelId) {
+  const questionTexts = questions.map(q => q.question.toLowerCase());
+  const uniqueQuestions = new Set(questionTexts);
+  
+  if (uniqueQuestions.size < questions.length) {
+    console.warn(`Level ${levelId} has duplicate questions`);
+  }
+  
+  // Check for generic terms that might indicate non-specific questions
+  const genericTerms = ['cyber security', 'online safety', 'internet'];
+  const specificity = questions.filter(q => 
+    !genericTerms.some(term => q.question.toLowerCase().includes(term))
+  ).length;
+  
+  console.log(`Level ${levelId} specificity: ${specificity}/${questions.length} questions are level-specific`);
+  
+  return questions;
 }
