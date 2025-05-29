@@ -15,6 +15,7 @@ import {
 } from '@heroicons/react/24/solid';
 import { motion } from 'framer-motion';
 import { useAuth } from '../../../context/AuthContext';
+import FeedbackButton from '../../../components/FeedbackButton';
 import { db } from '../../../lib/firebase';
 import {
   collection,
@@ -420,6 +421,9 @@ export default function LevelsPage() {
           </Link>
         </div>
       </div>
+
+      {/* Feedback Button */}
+      <FeedbackButton />
     </div>
   );
 }

@@ -18,6 +18,7 @@ import {
   CalendarIcon,
 } from '@heroicons/react/24/solid';
 import AuthWrapper from '../../components/AuthWrapper';
+import FeedbackButton from '../../components/FeedbackButton';
 
 const avatarEmojis = [
   '👧',
@@ -374,6 +375,9 @@ function ProfilePage() {
           </Link>
         </div>
       </div>
+
+      {/* Feedback Button */}
+      <FeedbackButton />
     </div>
   );
 }

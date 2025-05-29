@@ -17,6 +17,7 @@ import {
 } from '@heroicons/react/24/solid';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../../../context/AuthContext';
+import FeedbackButton from '../../../../components/FeedbackButton';
 import {
   generateQuestionsForLevel,
   getLevelDefinitions,
@@ -824,6 +825,9 @@ export default function GameplayPage({ params }) {
           </Link>
         </div>
       </div>
+
+      {/* Feedback Button */}
+      <FeedbackButton />
     </div>
   );
 }

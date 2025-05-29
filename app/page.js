@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { ShieldCheckIcon, TrophyIcon, UserIcon } from "@heroicons/react/24/solid";
 import { useAuth } from "../context/AuthContext";
 import { useRouter } from "next/navigation";
+import FeedbackButton from "../components/FeedbackButton";
 
 export default function Home() {
   const { user, userProfile, signOut } = useAuth();
@@ -137,6 +138,9 @@ export default function Home() {
           </motion.p>
         )}
       </div>
+
+      {/* Feedback Button */}
+      <FeedbackButton />
     </main>
   );
 }

@@ -12,6 +12,7 @@ import {
 import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { getFirebaseLeaderboardData } from '../../lib/firebase';
+import FeedbackButton from '../../components/FeedbackButton';
 
 export default function LeaderboardPage() {
   const { user, userProfile } = useAuth();
@@ -286,6 +287,9 @@ export default function LeaderboardPage() {
           </Link>
         </div>
       </div>
+
+      {/* Feedback Button */}
+      <FeedbackButton />
     </div>
   );
 }
