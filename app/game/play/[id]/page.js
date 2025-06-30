@@ -141,7 +141,7 @@ export default function GameplayPage({ params }) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(3);
-  const [timeLeft, setTimeLeft] = useState(30);
+  const [timeLeft, setTimeLeft] = useState(60);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [showExplanation, setShowExplanation] = useState(false);
   const [gameOver, setGameOver] = useState(false);
@@ -225,7 +225,7 @@ export default function GameplayPage({ params }) {
         setGeneratingQuestions(false);
         setShowExplanation(false);
         setSelectedAnswer(null);
-        setTimeLeft(30);
+        setTimeLeft(60);
         setGameOver(false);
         setLevelComplete(false);
       } catch (error) {
@@ -356,7 +356,7 @@ export default function GameplayPage({ params }) {
       setCurrentQuestionIndex((prevIndex) => prevIndex + 1);
       setSelectedAnswer(null);
       setShowExplanation(false);
-      setTimeLeft(30);
+      setTimeLeft(60);
       setIsAnswerCorrect(null);
     } else {
       // Level completed - save progress
