@@ -21,6 +21,14 @@ export default function ProgressDashboard({
   levels,
   recentAchievements = []
 }) {
+  // Get the last played level from localStorage
+  const getLastPlayedLevel = () => {
+    if (typeof window !== 'undefined' && userProfile?.id) {
+      const lastPlayed = localStorage.getItem(`lastPlayedLevel_${userProfile.id}`);
+      return lastPlayed ? parseInt(lastPlayed) : null;
+    }
+    return null;
+  };
   // Sample achievements for demo purposes when no real achievements are loaded
   const sampleAchievements = [
     {
@@ -154,25 +162,92 @@ export default function ProgressDashboard({
           </h3>
           
           <div className="space-y-3">
-            <Link href="/game/levels" className="block">
-              <button className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-4 rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg">
-                <ShieldCheckIcon className="w-4 h-4" />
-                Continue Learning
-              </button>
-            </Link>
+            {(() => {
+              // Ensure we have levels data
+              if (!levels || levels.length === 0) {
+                return (
+                  <Link 
+                    href="/game/levels" 
+                    className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-4 rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+                  >
+                    <ShieldCheckIcon className="w-4 h-4" />
+                    Start Learning
+                  </Link>
+                );
+              }
+              
+              // Find where the player left off
+              let targetLevel = null;
+              let buttonText = 'Continue Learning';
+              let targetUrl = '/game/levels';
+              
+              const lastPlayedLevelId = getLastPlayedLevel();
+              
+              // Strategy 1: If we have a last played level and it's not completed, continue there
+              if (lastPlayedLevelId) {
+                const lastPlayedLevel = levels.find(level => level.id === lastPlayedLevelId);
+                if (lastPlayedLevel && lastPlayedLevel.unlocked && !lastPlayedLevel.completed) {
+                  targetLevel = lastPlayedLevel;
+                  buttonText = `Continue Level ${targetLevel.id}`;
+                }
+              }
+              
+              // Strategy 2: If no valid last played level, find the first unlocked incomplete level
+              if (!targetLevel) {
+                targetLevel = levels.find(level => level.unlocked === true && level.completed === false);
+                if (targetLevel) {
+                  buttonText = `Continue Level ${targetLevel.id}`;
+                }
+              }
+              
+              // Strategy 3: If all unlocked levels are completed, find the next level to unlock
+              if (!targetLevel) {
+                const highestCompletedId = Math.max(...levels.filter(l => l.completed).map(l => l.id), 0);
+                targetLevel = levels.find(level => level.id === highestCompletedId + 1);
+                if (targetLevel) {
+                  buttonText = `Start Level ${targetLevel.id}`;
+                }
+              }
+              
+              // Strategy 4: Handle completion or fallback
+              if (!targetLevel) {
+                if (progressStats.completedCount === levels.length) {
+                  buttonText = 'All Levels Complete!';
+                  targetUrl = '/game/levels';
+                } else {
+                  // Fallback: go to level 1
+                  buttonText = 'Start Level 1';
+                  targetUrl = '/game/play/1';
+                }
+              } else {
+                targetUrl = `/game/play/${targetLevel.id}`;
+              }
+              
+              return (
+                <Link 
+                  href={targetUrl} 
+                  className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-4 rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+                >
+                  <ShieldCheckIcon className="w-4 h-4" />
+                  {buttonText}
+                </Link>
+              );
+            })()}
             
             <div className="grid grid-cols-3 gap-2">
-              <Link href="/profile" className="block">
-                <button className="w-full bg-gray-100 text-gray-700 py-2 px-3 rounded-lg text-sm font-medium hover:bg-blue-100 hover:text-blue-700 transition-all flex items-center justify-center gap-1 border border-gray-200 hover:border-blue-300">
-                  <ChartBarIcon className="w-4 h-4" />
-                  Stats
-                </button>
+              <Link 
+                href="/profile" 
+                className="w-full bg-gray-100 text-gray-700 py-2 px-3 rounded-lg text-sm font-medium hover:bg-blue-100 hover:text-blue-700 transition-all flex items-center justify-center gap-1 border border-gray-200 hover:border-blue-300"
+              >
+                <ChartBarIcon className="w-4 h-4" />
+                Stats
               </Link>
-              <Link href="/leaderboard" className="block">
-                <button className="w-full bg-gray-100 text-gray-700 py-2 px-3 rounded-lg text-sm font-medium hover:bg-yellow-100 hover:text-yellow-700 transition-all flex items-center justify-center gap-1 border border-gray-200 hover:border-yellow-300">
-                  <TrophyIcon className="w-4 h-4" />
-                  Ranks
-                </button>
+              <Link 
+                href="/leaderboard" 
+                className="w-full bg-gray-100 text-gray-700 py-2 px-3 rounded-lg text-sm font-medium hover:bg-yellow-100 hover:text-yellow-700 transition-all flex items-center justify-center gap-1 border border-gray-200 hover:border-yellow-300"
+              >
+                <TrophyIcon className="w-4 h-4" />
+                Ranks
               </Link>
               <button 
                 onClick={() => {
@@ -243,10 +318,11 @@ export default function ProgressDashboard({
               ))}
               
               {displayAchievements.length > 3 && (
-                <Link href="/profile#achievements" className="block">
-                  <button className="w-full text-center py-2 text-sm text-purple-600 hover:text-purple-700 font-medium">
-                    View all achievements ({displayAchievements.length})
-                  </button>
+                <Link 
+                  href="/profile#achievements" 
+                  className="w-full text-center py-2 text-sm text-purple-600 hover:text-purple-700 font-medium block"
+                >
+                  View all achievements ({displayAchievements.length})
                 </Link>
               )}
             </div>
@@ -254,10 +330,11 @@ export default function ProgressDashboard({
             <div className="text-center py-8">
               <div className="text-4xl mb-3">🏆</div>
               <p className="text-gray-600 text-sm mb-3">Complete levels to earn achievements!</p>
-              <Link href="/game/levels">
-                <button className="text-sm text-purple-600 hover:text-purple-700 font-medium">
-                  Start your first level →
-                </button>
+              <Link 
+                href="/game/levels"
+                className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+              >
+                Start your first level →
               </Link>
             </div>
           )}
