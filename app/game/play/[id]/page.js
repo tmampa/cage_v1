@@ -214,6 +214,11 @@ export default function GameplayPage({ params }) {
 
         setLevel(currentLevel);
 
+        // Save this as the last played level
+        if (user?.id) {
+          localStorage.setItem(`lastPlayedLevel_${user.id}`, levelId.toString());
+        }
+
         // Check for existing progress
         let userProgress = null;
         if (user?.id) {
@@ -358,8 +363,11 @@ export default function GameplayPage({ params }) {
       try {
         await saveLevelProgress(user.id, levelId, score, passed);
 
-        // If this level was completed successfully, we'll unlock the next level
-        // (handled in the saveLevelProgress function)
+        // If this level was completed successfully, clear the last played level
+        // so the continue button moves to the next level
+        if (passed) {
+          localStorage.removeItem(`lastPlayedLevel_${user.id}`);
+        }
 
         console.log(`Progress saved for level ${levelId}`);
       } catch (error) {
