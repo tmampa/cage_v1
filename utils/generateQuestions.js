@@ -9,6 +9,12 @@ const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY);
 // Track pending requests to prevent duplicate API calls
 const pendingRequests = {};
 
+// Question cache to store generated questions and avoid regenerating
+const questionCache = new Map();
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes in milliseconds
+
+// Cache structure: { questions: Array, timestamp: number, levelId: number }
+
 // Level definitions with their topics and difficulty
 const levelDefinitions = [
   {
@@ -233,7 +239,15 @@ function shuffleQuestionOptions(question) {
  */
 export async function generateQuestionsForLevel(levelId) {
   try {
-    const cacheKey = `level_${levelId}_${Date.now()}`; // Add timestamp for uniqueness
+    // Check cache first
+    const cacheKey = `level_${levelId}`;
+    const cachedData = questionCache.get(cacheKey);
+
+    if (cachedData && Date.now() - cachedData.timestamp < CACHE_DURATION) {
+      console.log(`Using cached questions for level ${levelId}`);
+      // Return a deep copy to prevent mutations
+      return JSON.parse(JSON.stringify(cachedData.questions));
+    }
 
     console.log(`Generating fresh questions for level ${levelId}`);
 
@@ -427,6 +441,13 @@ export async function generateQuestionsForLevel(levelId) {
         console.log(
           `Successfully generated ${validationResult.questions.length} questions for level ${levelId}`
         );
+
+        // Cache the generated questions
+        questionCache.set(cacheKey, {
+          questions: validationResult.questions,
+          timestamp: Date.now(),
+          levelId: parseInt(levelId),
+        });
 
         return JSON.parse(JSON.stringify(validationResult.questions));
       } catch (e) {

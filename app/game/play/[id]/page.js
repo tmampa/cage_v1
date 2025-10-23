@@ -18,10 +18,17 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../../../context/AuthContext';
 import FeedbackButton from '../../../../components/FeedbackButton';
+import HintSystem from '../../../../components/HintSystem';
+import AchievementNotification from '../../../../components/AchievementNotification';
+import { QuestionGenerationLoader, LevelLoadingSpinner } from '../../../../components/LoadingSpinner';
 import {
   generateQuestionsForLevel,
   getLevelDefinitions,
 } from '../../../../utils/generateQuestions';
+import { 
+  checkAchievements, 
+  DEFAULT_USER_STATS 
+} from '../../../../utils/achievements';
 import { db } from '../../../../lib/firebase';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import React from 'react';
@@ -142,6 +149,15 @@ export default function GameplayPage({ params }) {
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(3);
   const [timeLeft, setTimeLeft] = useState(60);
+  
+  // New enhancement states
+  const [hintsRemaining, setHintsRemaining] = useState(3);
+  const [currentStreak, setCurrentStreak] = useState(0);
+  const [maxStreak, setMaxStreak] = useState(0);
+  const [questionStartTime, setQuestionStartTime] = useState(null);
+  const [fastestAnswer, setFastestAnswer] = useState(Infinity);
+  const [newAchievement, setNewAchievement] = useState(null);
+  const [userStats, setUserStats] = useState(DEFAULT_USER_STATS);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [showExplanation, setShowExplanation] = useState(false);
   const [gameOver, setGameOver] = useState(false);
@@ -228,6 +244,13 @@ export default function GameplayPage({ params }) {
         setTimeLeft(60);
         setGameOver(false);
         setLevelComplete(false);
+        
+        // Initialize enhancement states
+        setHintsRemaining(3);
+        setCurrentStreak(0);
+        setMaxStreak(0);
+        setFastestAnswer(Infinity);
+        setQuestionStartTime(Date.now());
       } catch (error) {
         console.error('Error loading level:', error);
         setError(`Failed to load level: ${error.message}`);
@@ -254,8 +277,29 @@ export default function GameplayPage({ params }) {
     const totalQuestions = questions.length;
     const passThreshold = Math.floor(totalQuestions * 0.6); // 60% correct to pass
     const passed = correctAnswers >= passThreshold;
+    const isPerfectScore = correctAnswers === totalQuestions;
 
     setLevelComplete(true);
+
+    // Update final user stats for achievement checking
+    const finalStats = {
+      ...userStats,
+      levelsCompleted: passed ? userStats.levelsCompleted + 1 : userStats.levelsCompleted,
+      perfectScores: isPerfectScore ? userStats.perfectScores + 1 : userStats.perfectScores,
+      noHintLevels: hintsRemaining === 3 && passed ? userStats.noHintLevels + 1 : userStats.noHintLevels
+    };
+
+    // Check for new achievements
+    try {
+      const newAchievements = checkAchievements(finalStats, []);
+      if (newAchievements.length > 0) {
+        // Show the first new achievement
+        setNewAchievement(newAchievements[0]);
+        console.log('New achievements earned:', newAchievements);
+      }
+    } catch (error) {
+      console.error('Error checking achievements:', error);
+    }
 
     // Save progress to Firebase
     if (user?.id) {
@@ -274,6 +318,13 @@ export default function GameplayPage({ params }) {
 
   // Current question
   const currentQuestion = questions[currentQuestionIndex];
+
+  // Reset question timing when question changes
+  useEffect(() => {
+    if (currentQuestion && !showExplanation) {
+      setQuestionStartTime(Date.now());
+    }
+  }, [currentQuestionIndex, currentQuestion, showExplanation]);
 
   // Timer effect
   useEffect(() => {
@@ -326,6 +377,9 @@ export default function GameplayPage({ params }) {
 
     setSelectedAnswer(answerIndex);
 
+    // Calculate answer time for speed tracking
+    const answerTime = questionStartTime ? (Date.now() - questionStartTime) / 1000 : 60;
+
     const correctAnswerIndex =
       currentQuestion.correctIndex !== undefined
         ? currentQuestion.correctIndex
@@ -335,6 +389,26 @@ export default function GameplayPage({ params }) {
       // Correct answer
       setScore((prevScore) => prevScore + 100);
       setIsAnswerCorrect(true);
+      
+      // Update streak and stats
+      setCurrentStreak(prev => {
+        const newStreak = prev + 1;
+        setMaxStreak(current => Math.max(current, newStreak));
+        return newStreak;
+      });
+      
+      // Track fastest answer
+      setFastestAnswer(prev => Math.min(prev, answerTime));
+      
+      // Update user stats
+      setUserStats(prev => ({
+        ...prev,
+        correctAnswers: prev.correctAnswers + 1,
+        totalAnswers: prev.totalAnswers + 1,
+        maxStreak: Math.max(prev.maxStreak, currentStreak + 1),
+        fastestAnswer: Math.min(prev.fastestAnswer, answerTime)
+      }));
+      
     } else {
       // Wrong answer
       setLives((prevLives) => {
@@ -345,9 +419,27 @@ export default function GameplayPage({ params }) {
         return newLives;
       });
       setIsAnswerCorrect(false);
+      
+      // Reset streak on wrong answer
+      setCurrentStreak(0);
+      
+      // Update user stats
+      setUserStats(prev => ({
+        ...prev,
+        totalAnswers: prev.totalAnswers + 1
+      }));
     }
 
     setShowExplanation(true);
+  };
+
+  // Handle hint usage
+  const handleHintUsed = () => {
+    setHintsRemaining(prev => Math.max(0, prev - 1));
+    setUserStats(prev => ({
+      ...prev,
+      hintsUsed: prev.hintsUsed + 1
+    }));
   };
 
   // Handle next question
@@ -358,6 +450,9 @@ export default function GameplayPage({ params }) {
       setShowExplanation(false);
       setTimeLeft(60);
       setIsAnswerCorrect(null);
+      
+      // Reset question timing for next question
+      setQuestionStartTime(Date.now());
     } else {
       // Level completed - save progress
       completedLevel();
@@ -384,25 +479,7 @@ export default function GameplayPage({ params }) {
 
   // If still loading or generating questions
   if (loading || generatingQuestions) {
-    return (
-      <div className='min-h-screen bg-gradient-to-b from-blue-300 to-purple-300 text-blue-900 flex flex-col items-center justify-center p-4'>
-        <div className='game-card p-8 text-center max-w-lg w-full'>
-          <div className='flex justify-center mb-4'>
-            <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-600'></div>
-          </div>
-          <h2 className='text-xl font-bold text-purple-700 mb-3'>
-            {generatingQuestions
-              ? 'Generating Questions...'
-              : 'Loading Level...'}
-          </h2>
-          <p className='text-blue-700'>
-            {generatingQuestions
-              ? 'Our AI is creating challenging cyber security questions just for you!'
-              : 'Getting everything ready for your cyber adventure!'}
-          </p>
-        </div>
-      </div>
-    );
+    return generatingQuestions ? <QuestionGenerationLoader /> : <LevelLoadingSpinner />;
   }
 
   // If there was an error
@@ -633,6 +710,14 @@ export default function GameplayPage({ params }) {
 
   return (
     <div className='min-h-screen bg-gradient-to-b from-blue-300 to-purple-300 text-blue-900 pb-20 relative'>
+      {/* Achievement Notification */}
+      {newAchievement && (
+        <AchievementNotification
+          achievement={newAchievement}
+          onClose={() => setNewAchievement(null)}
+        />
+      )}
+      
       {/* Decorative bubbles */}
       <div className='bubble w-20 h-20 top-20 left-10'></div>
       <div className='bubble w-16 h-16 top-40 right-10'></div>
@@ -650,6 +735,10 @@ export default function GameplayPage({ params }) {
             <div className='flex items-center'>
               <StarIcon className='w-5 h-5 text-yellow-500 mr-1' />
               <span className='font-bold'>{score}</span>
+            </div>
+            <div className='flex items-center gap-1'>
+              <span className='text-xs text-blue-600'>💡</span>
+              <span className='text-sm font-medium text-blue-700'>{hintsRemaining}</span>
             </div>
             <div className='flex items-center'>{renderLives()}</div>
           </div>
@@ -699,6 +788,18 @@ export default function GameplayPage({ params }) {
             <h3 className='text-xl font-bold mb-4 text-blue-800'>
               {currentQuestion?.question}
             </h3>
+
+            {/* Hint System */}
+            {!showExplanation && (
+              <div className="mb-4">
+                <HintSystem
+                  question={currentQuestion}
+                  onHintUsed={handleHintUsed}
+                  hintsRemaining={hintsRemaining}
+                  disabled={showExplanation || selectedAnswer !== null}
+                />
+              </div>
+            )}
 
             {/* Answer options */}
             <motion.div
