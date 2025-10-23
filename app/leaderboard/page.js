@@ -8,11 +8,17 @@ import {
   UserIcon,
   HomeIcon,
   PuzzlePieceIcon,
+  MagnifyingGlassIcon,
+  CalendarIcon,
+  StarIcon,
+  FireIcon,
 } from '@heroicons/react/24/solid';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { getFirebaseLeaderboardData } from '../../lib/firebase';
 import FeedbackButton from '../../components/FeedbackButton';
+import EnhancedButton from '../../components/EnhancedButton';
+import LoadingSpinner from '../../components/LoadingSpinner';
 
 export default function LeaderboardPage() {
   const { user, userProfile } = useAuth();
@@ -57,18 +63,60 @@ export default function LeaderboardPage() {
     )
     .sort((a, b) => b.score - a.score);
 
-  // Get medal emoji based on rank
-  const getMedalEmoji = (index) => {
+  // Get medal emoji and styling based on rank
+  const getRankStyling = (index) => {
     switch (index) {
       case 0:
-        return '🥇';
+        return {
+          medal: '🥇',
+          bgColor: 'bg-gradient-to-r from-yellow-100 to-yellow-200',
+          textColor: 'text-yellow-800',
+          borderColor: 'border-yellow-300'
+        };
       case 1:
-        return '🥈';
+        return {
+          medal: '🥈',
+          bgColor: 'bg-gradient-to-r from-gray-100 to-gray-200',
+          textColor: 'text-gray-800',
+          borderColor: 'border-gray-300'
+        };
       case 2:
-        return '🥉';
+        return {
+          medal: '🥉',
+          bgColor: 'bg-gradient-to-r from-orange-100 to-orange-200',
+          textColor: 'text-orange-800',
+          borderColor: 'border-orange-300'
+        };
       default:
-        return '';
+        return {
+          medal: '',
+          bgColor: 'bg-white',
+          textColor: 'text-gray-800',
+          borderColor: 'border-gray-200'
+        };
     }
+  };
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.05,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: {
+      y: 0,
+      opacity: 1,
+      transition: {
+        type: 'spring',
+        stiffness: 100,
+      },
+    },
   };
 
   return (
@@ -142,52 +190,47 @@ export default function LeaderboardPage() {
           </motion.div>
         )}
 
-        {/* Filter controls */}
-        <div className='game-card p-4 mb-6'>
-          <div className='flex flex-col sm:flex-row gap-4'>
-            <div className='flex-grow'>
+        {/* Enhanced Filter controls */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className='game-card p-4 mb-6'
+        >
+          <div className='flex flex-col gap-4'>
+            {/* Search Bar */}
+            <div className='relative'>
+              <MagnifyingGlassIcon className='absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400' />
               <input
                 type='text'
-                placeholder='Search players...'
+                placeholder='Search cyber heroes...'
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className='w-full px-4 py-2 rounded-full border border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400'
+                className='w-full pl-10 pr-4 py-3 rounded-xl border border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all'
               />
             </div>
-            <div className='flex gap-2'>
-              <button
-                onClick={() => setTimeFilter('all')}
-                className={`px-4 py-2 rounded-full text-sm font-bold ${
-                  timeFilter === 'all'
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-blue-100 text-blue-500 hover:bg-blue-200'
-                }`}
-              >
-                All Time
-              </button>
-              <button
-                onClick={() => setTimeFilter('week')}
-                className={`px-4 py-2 rounded-full text-sm font-bold ${
-                  timeFilter === 'week'
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-blue-100 text-blue-500 hover:bg-blue-200'
-                }`}
-              >
-                This Week
-              </button>
-              <button
-                onClick={() => setTimeFilter('month')}
-                className={`px-4 py-2 rounded-full text-sm font-bold ${
-                  timeFilter === 'month'
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-blue-100 text-blue-500 hover:bg-blue-200'
-                }`}
-              >
-                This Month
-              </button>
+            
+            {/* Time Filter Buttons */}
+            <div className='flex gap-2 overflow-x-auto'>
+              {[
+                { key: 'all', label: 'All Time', icon: <StarIcon className="w-4 h-4" /> },
+                { key: 'week', label: 'This Week', icon: <FireIcon className="w-4 h-4" /> },
+                { key: 'month', label: 'This Month', icon: <CalendarIcon className="w-4 h-4" /> }
+              ].map((filter) => (
+                <EnhancedButton
+                  key={filter.key}
+                  variant={timeFilter === filter.key ? 'primary' : 'ghost'}
+                  size="small"
+                  onClick={() => setTimeFilter(filter.key)}
+                  icon={filter.icon}
+                  className="whitespace-nowrap"
+                >
+                  {filter.label}
+                </EnhancedButton>
+              ))}
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Leaderboard list */}
         <div className='game-card overflow-hidden'>
@@ -201,9 +244,11 @@ export default function LeaderboardPage() {
           )}
 
           {loading && !error && (
-            <div className='text-center py-10'>
-              <div className='inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4'></div>
-              <p className='text-blue-700'>Loading leaderboard...</p>
+            <div className='py-10'>
+              <LoadingSpinner 
+                message="Loading Leaderboard..."
+                submessage="Fetching the latest cyber hero rankings!"
+              />
             </div>
           )}
 
@@ -222,35 +267,112 @@ export default function LeaderboardPage() {
           )}
 
           {!loading && !error && filteredData.length > 0 && (
-            <div className='divide-y divide-blue-100'>
-              {filteredData.map((player, index) => (
-                <motion.div
-                  key={player.userId}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className={`flex items-center p-4 ${
-                    player.userId === user?.id ? 'bg-blue-50' : ''
-                  }`}
-                >
-                  <div className='w-8 text-center font-bold text-purple-700'>
-                    {index + 1}
-                  </div>
-                  <div className='w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-xl mx-4'>
-                    {player.avatar_emoji || '👤'}
-                  </div>
-                  <div className='flex-grow'>
-                    <p className='font-bold text-blue-900'>
-                      {player.username}
-                      {getMedalEmoji(index)}
-                    </p>
-                    <p className='text-sm text-blue-600'>
-                      Score: {player.score}
-                    </p>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              className='space-y-2 p-4'
+            >
+              {filteredData.map((player, index) => {
+                const rankStyling = getRankStyling(index);
+                const isCurrentUser = player.userId === user?.id;
+                
+                return (
+                  <motion.div
+                    key={player.userId}
+                    variants={itemVariants}
+                    whileHover={{ scale: 1.02, y: -2 }}
+                    className={`
+                      relative overflow-hidden rounded-xl border-2 transition-all duration-200
+                      ${rankStyling.bgColor} ${rankStyling.borderColor}
+                      ${isCurrentUser ? 'ring-2 ring-purple-400 ring-opacity-50' : ''}
+                      ${index < 3 ? 'shadow-lg' : 'shadow-md'}
+                    `}
+                  >
+                    {/* Rank Badge */}
+                    <div className='absolute top-2 left-2'>
+                      <div className={`
+                        w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm
+                        ${index < 3 ? 'bg-white shadow-md' : 'bg-gray-100'}
+                        ${rankStyling.textColor}
+                      `}>
+                        {index + 1}
+                      </div>
+                    </div>
+
+                    {/* Medal for top 3 */}
+                    {rankStyling.medal && (
+                      <div className='absolute top-2 right-2 text-2xl'>
+                        {rankStyling.medal}
+                      </div>
+                    )}
+
+                    {/* Current user indicator */}
+                    {isCurrentUser && (
+                      <div className='absolute top-2 right-12 bg-purple-500 text-white text-xs px-2 py-1 rounded-full font-medium'>
+                        You
+                      </div>
+                    )}
+
+                    <div className='flex items-center p-4 pt-12'>
+                      {/* Avatar */}
+                      <div className={`
+                        w-12 h-12 rounded-full flex items-center justify-center text-2xl mr-4
+                        ${index < 3 ? 'bg-white shadow-md' : 'bg-gray-100'}
+                      `}>
+                        {player.avatar_emoji || '👤'}
+                      </div>
+
+                      {/* Player Info */}
+                      <div className='flex-grow'>
+                        <div className='flex items-center gap-2 mb-1'>
+                          <h3 className={`font-bold text-lg ${rankStyling.textColor}`}>
+                            {player.username}
+                          </h3>
+                          {index < 3 && (
+                            <StarIcon className='w-4 h-4 text-yellow-500' />
+                          )}
+                        </div>
+                        
+                        <div className='flex items-center gap-4 text-sm'>
+                          <div className='flex items-center gap-1'>
+                            <TrophyIcon className='w-4 h-4 text-yellow-600' />
+                            <span className={`font-semibold ${rankStyling.textColor}`}>
+                              {player.score.toLocaleString()} pts
+                            </span>
+                          </div>
+                          
+                          {player.updatedAt && (
+                            <div className='text-gray-600 text-xs'>
+                              Last active: {new Date(player.updatedAt).toLocaleDateString()}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Score Display */}
+                      <div className='text-right'>
+                        <div className={`text-2xl font-bold ${rankStyling.textColor}`}>
+                          #{index + 1}
+                        </div>
+                        {index < 3 && (
+                          <div className='text-xs text-gray-600'>
+                            Top Player
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Animated background for top 3 */}
+                    {index < 3 && (
+                      <div className='absolute inset-0 opacity-10 pointer-events-none'>
+                        <div className='absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent animate-pulse' />
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </motion.div>
           )}
         </div>
       </div>

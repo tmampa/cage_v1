@@ -3,19 +3,23 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
-  LockClosedIcon,
-  LockOpenIcon,
   ArrowLeftIcon,
-  StarIcon,
   TrophyIcon,
   UserIcon,
   HomeIcon,
   PuzzlePieceIcon,
-  CheckIcon,
+  Cog6ToothIcon,
+  MapIcon,
+  ViewColumnsIcon,
 } from '@heroicons/react/24/solid';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../../context/AuthContext';
 import FeedbackButton from '../../../components/FeedbackButton';
+import EnhancedLevelCard from '../../../components/EnhancedLevelCard';
+import LevelMap from '../../../components/LevelMap';
+import ProgressDashboard from '../../../components/ProgressDashboard';
+import LevelFilters from '../../../components/LevelFilters';
+import EnhancedButton from '../../../components/EnhancedButton';
 import { db } from '../../../lib/firebase';
 import {
   collection,
@@ -25,6 +29,7 @@ import {
   doc,
   getDoc,
 } from 'firebase/firestore';
+import { getAchievementProgress } from '../../../utils/achievements';
 
 export default function LevelsPage() {
   const { user, userProfile } = useAuth();
@@ -110,6 +115,18 @@ export default function LevelsPage() {
     unlockedCount: 1,
     completedCount: 0,
     progressPercentage: 0,
+    completedLevels: [],
+  });
+
+  // Recent achievements state
+  const [recentAchievements, setRecentAchievements] = useState([]);
+
+  // New state for enhanced UI
+  const [viewMode, setViewMode] = useState('map'); // 'map', 'grid'
+  const [filters, setFilters] = useState({
+    difficulty: 'all',
+    status: 'all',
+    sort: 'order'
   });
 
   // Load user progress from Firebase
@@ -163,7 +180,20 @@ export default function LevelsPage() {
           unlockedCount,
           completedCount,
           progressPercentage,
+          completedLevels: updatedLevels.filter(l => l.completed).map(l => l.id),
         });
+
+        // Load recent achievements from localStorage
+        const storedAchievements = localStorage.getItem(`achievements_${user.id}`);
+        if (storedAchievements) {
+          const achievements = JSON.parse(storedAchievements);
+          // Sort by earnedAt date and take the 5 most recent
+          const recent = achievements
+            .filter(a => a.earnedAt)
+            .sort((a, b) => new Date(b.earnedAt) - new Date(a.earnedAt))
+            .slice(0, 5);
+          setRecentAchievements(recent);
+        }
       } catch (error) {
         console.error('Error loading user progress:', error);
       }
@@ -171,6 +201,45 @@ export default function LevelsPage() {
 
     loadUserProgress();
   }, [user?.id]);
+
+  // Filter and sort levels based on current filters
+  const getFilteredLevels = () => {
+    let filtered = [...levels];
+
+    // Apply difficulty filter
+    if (filters.difficulty !== 'all') {
+      filtered = filtered.filter(level => level.difficulty === filters.difficulty);
+    }
+
+    // Apply status filter
+    if (filters.status !== 'all') {
+      filtered = filtered.filter(level => {
+        switch (filters.status) {
+          case 'unlocked': return level.unlocked;
+          case 'completed': return level.completed;
+          case 'locked': return !level.unlocked;
+          default: return true;
+        }
+      });
+    }
+
+    // Apply sorting
+    switch (filters.sort) {
+      case 'difficulty':
+        const difficultyOrder = { 'Easy': 1, 'Medium': 2, 'Hard': 3 };
+        filtered.sort((a, b) => difficultyOrder[a.difficulty] - difficultyOrder[b.difficulty]);
+        break;
+      case 'points':
+        filtered.sort((a, b) => b.points - a.points);
+        break;
+      default: // 'order'
+        filtered.sort((a, b) => a.id - b.id);
+    }
+
+    return filtered;
+  };
+
+  const filteredLevels = getFilteredLevels();
 
   // Animation variants
   const containerVariants = {
@@ -196,226 +265,206 @@ export default function LevelsPage() {
   };
 
   return (
-    <div className='min-h-screen bg-gradient-to-b from-blue-300 to-purple-300 text-blue-900 relative overflow-hidden pb-20'>
-      {/* Decorative bubbles */}
-      <div className='bubble w-20 h-20 top-20 left-10 opacity-60'></div>
-      <div className='bubble w-16 h-16 top-40 right-10 opacity-60'></div>
-      <div className='bubble w-24 h-24 bottom-20 left-1/3 opacity-60'></div>
-      <div className='bubble w-12 h-12 top-1/3 right-20 opacity-60'></div>
+    <div className='min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 text-gray-900 relative pb-20'>
+      {/* Animated Background Elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-20 left-10 w-32 h-32 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
+        <div className="absolute top-40 right-20 w-32 h-32 bg-purple-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000"></div>
+        <div className="absolute bottom-32 left-20 w-32 h-32 bg-pink-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-4000"></div>
+      </div>
 
-      {/* User profile in top right */}
-      {user && userProfile && (
-        <div className='absolute top-4 right-4 z-20'>
-          <Link href='/profile'>
-            <div className='flex items-center gap-2 bg-white rounded-lg px-3 py-1 shadow-md hover:bg-blue-50 transition-colors'>
-              <div className='bg-blue-100 rounded-full p-1'>
-                <span className='text-xl'>
-                  {userProfile?.avatar_emoji || '👤'}
-                </span>
-              </div>
-              <span className='font-bold text-purple-700'>
-                {userProfile?.username || 'User'}
-              </span>
-            </div>
+      {/* Header */}
+      <div className='relative z-10'>
+        <div className='flex items-center justify-between p-4'>
+          <Link href='/' className='flex items-center text-gray-600 hover:text-gray-800 transition-colors'>
+            <ArrowLeftIcon className='w-5 h-5 mr-2' />
+            <span className="font-medium">Home</span>
           </Link>
-        </div>
-      )}
 
-      {/* Header section */}
-      <div className='pt-4 px-4'>
+          {/* View Mode Toggle */}
+          <div className='flex items-center gap-2 bg-white rounded-lg p-1 shadow-sm'>
+            <button
+              onClick={() => setViewMode('map')}
+              className={`p-2 rounded-md transition-all ${
+                viewMode === 'map' 
+                  ? 'bg-blue-500 text-white shadow-sm' 
+                  : 'text-gray-600 hover:text-blue-500'
+              }`}
+            >
+              <MapIcon className='w-4 h-4' />
+            </button>
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-2 rounded-md transition-all ${
+                viewMode === 'grid' 
+                  ? 'bg-blue-500 text-white shadow-sm' 
+                  : 'text-gray-600 hover:text-blue-500'
+              }`}
+            >
+              <ViewColumnsIcon className='w-4 h-4' />
+            </button>
+          </div>
+
+          {/* User Profile */}
+          {user && userProfile && (
+            <Link href='/profile'>
+              <motion.div 
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className='flex items-center gap-2 bg-white rounded-xl px-3 py-2 shadow-sm hover:shadow-md transition-all'
+              >
+                <div className='w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center'>
+                  <span className='text-lg'>{userProfile?.avatar_emoji || '👤'}</span>
+                </div>
+                <div className="hidden sm:block">
+                  <div className='text-sm font-bold text-gray-800'>{userProfile?.username || 'User'}</div>
+                  <div className='text-xs text-gray-500'>{userProfile?.score || 0} pts</div>
+                </div>
+              </motion.div>
+            </Link>
+          )}
+        </div>
+
+        {/* Page Title */}
         <motion.div
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.5 }}
-          className='text-center mt-4 mb-6'
+          transition={{ duration: 0.6 }}
+          className='text-center px-4 mb-8'
         >
-          <h1 className='text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-600 to-blue-600 mb-2'>
-            Choose Your Level
+          <h1 className='text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent mb-2'>
+            CAGE
           </h1>
-          <p className='text-center text-blue-700 text-sm'>
-            Complete levels to unlock new challenges!
-          </p>
+          <p className='text-gray-600 text-lg'>Master the art of digital defense</p>
         </motion.div>
       </div>
 
-      {/* Progress overview - more compact for mobile */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className='px-4 mb-6'
-      >
-        <div className='game-card p-4'>
-          <div className='flex items-center justify-between'>
-            <div className='flex items-center'>
-              <div className='w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3'>
-                <TrophyIcon className='w-5 h-5 text-yellow-500' />
-              </div>
-              <div>
-                <h3 className='text-base font-bold text-purple-700'>
-                  Your Progress
-                </h3>
-                <p className='text-blue-700 text-xs'>
-                  Keep playing to unlock more!
-                </p>
-              </div>
-            </div>
-            <div>
-              <p className='text-xs text-blue-600'>Points</p>
-              <p className='text-xl font-bold text-purple-700'>
-                {userProfile?.score || 0}
-              </p>
-            </div>
-          </div>
+      {/* Main Content */}
+      <div className='relative z-10 px-4 space-y-8'>
+        {/* Progress Dashboard */}
+        <ProgressDashboard 
+          userProfile={userProfile}
+          progressStats={progressStats}
+          levels={levels}
+          recentAchievements={recentAchievements}
+        />
 
-          {/* Progress bar */}
-          <div className='mt-3'>
-            <div className='flex justify-between text-xs text-blue-700 mb-1'>
-              <span>
-                Levels Unlocked: {progressStats.unlockedCount}/{levels.length}
-              </span>
-              <span>
-                Completed: {progressStats.completedCount}/{levels.length}
-              </span>
-            </div>
-            <div className='h-3 bg-blue-100 rounded-full overflow-hidden'>
-              <div
-                className='h-full bg-gradient-to-r from-blue-400 to-purple-500 rounded-full'
-                style={{ width: `${progressStats.progressPercentage}%` }}
-              ></div>
-            </div>
-          </div>
-        </div>
-      </motion.div>
+        {/* Level Filters (only show in grid mode) */}
+        {viewMode === 'grid' && (
+          <LevelFilters 
+            levels={levels}
+            onFilterChange={setFilters}
+            activeFilters={filters}
+          />
+        )}
 
-      {/* Levels grid - 2x2 layout */}
-      <motion.div
-        variants={containerVariants}
-        initial='hidden'
-        animate='visible'
-        className='px-4'
-      >
-        <div className='grid grid-cols-2 gap-3'>
-          {levels.map((level) => (
+        {/* Level Content */}
+        <AnimatePresence mode="wait">
+          {viewMode === 'map' ? (
             <motion.div
-              key={level.id}
-              variants={itemVariants}
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.98 }}
-              className='game-card overflow-hidden shadow-md'
+              key="map"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.3 }}
             >
-              <div
-                className={`bg-gradient-to-r ${level.color} p-3 text-white relative`}
-              >
-                <div className='flex justify-between items-center'>
-                  <span className='text-3xl drop-shadow-md'>{level.icon}</span>
-                  <div className='bg-white bg-opacity-20 rounded-full p-1.5'>
-                    {level.unlocked ? (
-                      <LockOpenIcon className='w-4 h-4 text-white' />
-                    ) : (
-                      <LockClosedIcon className='w-4 h-4 text-white' />
-                    )}
-                  </div>
-                </div>
-                <h2 className='text-sm font-bold mt-2 line-clamp-1'>
-                  {level.title}
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold text-gray-800 mb-2 flex items-center gap-2">
+                  <MapIcon className="w-6 h-6 text-blue-500" />
+                  Learning Path
                 </h2>
+                <p className="text-gray-600">Follow the path to become a cybersecurity expert</p>
               </div>
-
-              <div className='p-3 flex flex-col'>
-                <p className='text-blue-700 mb-2 flex-grow text-xs line-clamp-2'>
-                  {level.description}
-                </p>
-
-                <div className='flex justify-between items-center text-xs mb-2'>
-                  <div className='flex'>
-                    <StarIcon
-                      className={`w-3 h-3 ${
-                        level.difficulty === 'Easy' ||
-                        level.difficulty === 'Medium' ||
-                        level.difficulty === 'Hard'
-                          ? 'text-yellow-400'
-                          : 'text-gray-300'
-                      }`}
-                    />
-                    <StarIcon
-                      className={`w-3 h-3 ${
-                        level.difficulty === 'Medium' ||
-                        level.difficulty === 'Hard'
-                          ? 'text-yellow-400'
-                          : 'text-gray-300'
-                      }`}
-                    />
-                    <StarIcon
-                      className={`w-3 h-3 ${
-                        level.difficulty === 'Hard'
-                          ? 'text-yellow-400'
-                          : 'text-gray-300'
-                      }`}
-                    />
-                  </div>
-                  <div className='text-purple-700 font-semibold'>
-                    {level.points} pts
-                  </div>
-                </div>
-
-                {level.unlocked ? (
-                  <>
-                    {level.completed && (
-                      <div className='flex justify-between text-xs mb-2'>
-                        <span className='text-green-600 font-semibold flex items-center'>
-                          <CheckIcon className='w-3 h-3 mr-1' />
-                          Completed
-                        </span>
-                        <span className='text-blue-600 font-semibold'>
-                          {level.userScore || 0} pts
-                        </span>
-                      </div>
-                    )}
-                    <Link href={`/game/play/${level.id}`}>
-                      <button className='btn-primary w-full py-1.5 text-xs'>
-                        {level.completed ? 'Play Again' : 'Play Now'}
-                      </button>
-                    </Link>
-                  </>
-                ) : (
-                  <button className='bg-gray-200 text-gray-500 py-1.5 px-3 rounded-full w-full cursor-not-allowed font-bold text-xs'>
-                    Locked
-                  </button>
-                )}
-              </div>
+              <LevelMap levels={levels} userProgress={progressStats} />
             </motion.div>
-          ))}
-        </div>
-      </motion.div>
+          ) : (
+            <motion.div
+              key="grid"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold text-gray-800 mb-2 flex items-center gap-2">
+                  <ViewColumnsIcon className="w-6 h-6 text-purple-500" />
+                  All Levels
+                </h2>
+                <p className="text-gray-600">Choose any unlocked level to practice</p>
+              </div>
+              
+              <motion.div
+                variants={containerVariants}
+                initial='hidden'
+                animate='visible'
+                className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
+              >
+                {filteredLevels.map((level) => (
+                  <motion.div
+                    key={level.id}
+                    variants={itemVariants}
+                    layout
+                  >
+                    <EnhancedLevelCard
+                      level={level}
+                      isUnlocked={level.unlocked}
+                      isCompleted={level.completed}
+                      userScore={level.userScore}
+                    />
+                  </motion.div>
+                ))}
+              </motion.div>
 
-      {/* Bottom Tabs Navigation Bar */}
-      <div className='fixed bottom-0 left-0 right-0 bg-white shadow-lg z-30'>
-        <div className='flex justify-around items-center'>
-          <Link href='/game/levels' className='flex-1'>
-            <div className='flex flex-col items-center py-3 text-blue-600'>
-              <HomeIcon className='w-6 h-6' />
+              {filteredLevels.length === 0 && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-center py-12"
+                >
+                  <div className="text-6xl mb-4">🔍</div>
+                  <h3 className="text-xl font-bold text-gray-700 mb-2">No levels found</h3>
+                  <p className="text-gray-500 mb-4">Try adjusting your filters to see more levels</p>
+                  <EnhancedButton
+                    variant="ghost"
+                    onClick={() => setFilters({ difficulty: 'all', status: 'all', sort: 'order' })}
+                  >
+                    Clear Filters
+                  </EnhancedButton>
+                </motion.div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Bottom Navigation */}
+      <div className='fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md shadow-lg z-30 border-t border-gray-200'>
+        <div className='flex justify-around items-center py-2'>
+          <Link href='/' className='flex-1'>
+            <div className='flex flex-col items-center py-2 text-gray-600 hover:text-blue-500 transition-colors'>
+              <HomeIcon className='w-5 h-5' />
               <span className='text-xs mt-1'>Home</span>
             </div>
           </Link>
 
           <Link href='/game/levels' className='flex-1'>
-            <div className='flex flex-col items-center py-3 text-purple-600 border-t-2 border-purple-600'>
-              <PuzzlePieceIcon className='w-6 h-6' />
-              <span className='text-xs mt-1'>Levels</span>
+            <div className='flex flex-col items-center py-2 text-blue-500 relative'>
+              <PuzzlePieceIcon className='w-5 h-5' />
+              <span className='text-xs mt-1 font-medium'>Levels</span>
+              <div className='absolute -top-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-blue-500 rounded-full'></div>
             </div>
           </Link>
 
           <Link href='/leaderboard' className='flex-1'>
-            <div className='flex flex-col items-center py-3 text-blue-600'>
-              <TrophyIcon className='w-6 h-6' />
+            <div className='flex flex-col items-center py-2 text-gray-600 hover:text-blue-500 transition-colors'>
+              <TrophyIcon className='w-5 h-5' />
               <span className='text-xs mt-1'>Leaderboard</span>
             </div>
           </Link>
 
           <Link href='/profile' className='flex-1'>
-            <div className='flex flex-col items-center py-3 text-blue-600'>
-              <UserIcon className='w-6 h-6' />
+            <div className='flex flex-col items-center py-2 text-gray-600 hover:text-blue-500 transition-colors'>
+              <UserIcon className='w-5 h-5' />
               <span className='text-xs mt-1'>Profile</span>
             </div>
           </Link>

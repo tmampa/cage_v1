@@ -18,10 +18,20 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../../../context/AuthContext';
 import FeedbackButton from '../../../../components/FeedbackButton';
+import HintSystem from '../../../../components/HintSystem';
+import AchievementNotification from '../../../../components/AchievementNotification';
+import { QuestionGenerationLoader, LevelLoadingSpinner } from '../../../../components/LoadingSpinner';
+import GameStats from '../../../../components/GameStats';
+import AnswerFeedback from '../../../../components/AnswerFeedback';
+import EnhancedQuestionCard from '../../../../components/EnhancedQuestionCard';
 import {
   generateQuestionsForLevel,
   getLevelDefinitions,
 } from '../../../../utils/generateQuestions';
+import { 
+  checkAchievements, 
+  DEFAULT_USER_STATS 
+} from '../../../../utils/achievements';
 import { db } from '../../../../lib/firebase';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import React from 'react';
@@ -142,6 +152,16 @@ export default function GameplayPage({ params }) {
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(3);
   const [timeLeft, setTimeLeft] = useState(60);
+  
+  // New enhancement states
+  const [hintsRemaining, setHintsRemaining] = useState(3);
+  const [currentStreak, setCurrentStreak] = useState(0);
+  const [maxStreak, setMaxStreak] = useState(0);
+  const [questionStartTime, setQuestionStartTime] = useState(null);
+  const [fastestAnswer, setFastestAnswer] = useState(Infinity);
+  const [newAchievement, setNewAchievement] = useState(null);
+  const [userStats, setUserStats] = useState(DEFAULT_USER_STATS);
+  const [userAchievements, setUserAchievements] = useState([]);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [showExplanation, setShowExplanation] = useState(false);
   const [gameOver, setGameOver] = useState(false);
@@ -228,6 +248,43 @@ export default function GameplayPage({ params }) {
         setTimeLeft(60);
         setGameOver(false);
         setLevelComplete(false);
+        
+        // Initialize enhancement states
+        setHintsRemaining(3);
+        setCurrentStreak(0);
+        setMaxStreak(0);
+        setFastestAnswer(Infinity);
+        setQuestionStartTime(Date.now());
+
+        // Initialize user stats based on actual progress
+        if (user?.id && userProfile) {
+          const currentScore = userProfile.score || 0;
+          const estimatedLevelsCompleted = Math.floor(currentScore / 100); // Rough estimate
+          const estimatedCorrectAnswers = estimatedLevelsCompleted * 5; // Estimate 5 questions per level
+          
+          const initialStats = {
+            ...DEFAULT_USER_STATS,
+            levelsCompleted: estimatedLevelsCompleted,
+            correctAnswers: estimatedCorrectAnswers,
+            totalAnswers: estimatedCorrectAnswers + Math.floor(estimatedCorrectAnswers * 0.2), // Add some wrong answers
+            perfectScores: Math.floor(estimatedLevelsCompleted * 0.3), // Estimate some perfect scores
+          };
+          
+          setUserStats(initialStats);
+          console.log('Initialized user stats:', initialStats);
+
+          // Load existing achievements from localStorage
+          try {
+            const savedAchievements = localStorage.getItem(`achievements_${user.id}`);
+            if (savedAchievements) {
+              const achievements = JSON.parse(savedAchievements);
+              setUserAchievements(achievements);
+              console.log('Loaded existing achievements:', achievements);
+            }
+          } catch (storageError) {
+            console.warn('Could not load achievements from localStorage:', storageError);
+          }
+        }
       } catch (error) {
         console.error('Error loading level:', error);
         setError(`Failed to load level: ${error.message}`);
@@ -254,8 +311,47 @@ export default function GameplayPage({ params }) {
     const totalQuestions = questions.length;
     const passThreshold = Math.floor(totalQuestions * 0.6); // 60% correct to pass
     const passed = correctAnswers >= passThreshold;
+    const isPerfectScore = correctAnswers === totalQuestions;
 
     setLevelComplete(true);
+
+    // Update final user stats for achievement checking
+    const finalStats = {
+      ...userStats,
+      levelsCompleted: passed ? userStats.levelsCompleted + 1 : userStats.levelsCompleted,
+      perfectScores: isPerfectScore ? userStats.perfectScores + 1 : userStats.perfectScores,
+      noHintLevels: hintsRemaining === 3 && passed ? userStats.noHintLevels + 1 : userStats.noHintLevels
+    };
+
+    // Update the user stats state
+    setUserStats(finalStats);
+
+    // Check for new achievements
+    try {
+      console.log('Checking achievements with stats:', finalStats);
+      console.log('Current user achievements:', userAchievements);
+      
+      const newAchievements = checkAchievements(finalStats, userAchievements);
+      if (newAchievements.length > 0) {
+        // Show the first new achievement
+        setNewAchievement(newAchievements[0]);
+        // Add to user achievements
+        setUserAchievements(prev => [...prev, ...newAchievements]);
+        console.log('New achievements earned:', newAchievements);
+        
+        // Save achievements to localStorage for persistence
+        try {
+          const savedAchievements = [...userAchievements, ...newAchievements];
+          localStorage.setItem(`achievements_${user?.id}`, JSON.stringify(savedAchievements));
+        } catch (storageError) {
+          console.warn('Could not save achievements to localStorage:', storageError);
+        }
+      } else {
+        console.log('No new achievements earned this time');
+      }
+    } catch (error) {
+      console.error('Error checking achievements:', error);
+    }
 
     // Save progress to Firebase
     if (user?.id) {
@@ -274,6 +370,13 @@ export default function GameplayPage({ params }) {
 
   // Current question
   const currentQuestion = questions[currentQuestionIndex];
+
+  // Reset question timing when question changes
+  useEffect(() => {
+    if (currentQuestion && !showExplanation) {
+      setQuestionStartTime(Date.now());
+    }
+  }, [currentQuestionIndex, currentQuestion, showExplanation]);
 
   // Timer effect
   useEffect(() => {
@@ -320,31 +423,108 @@ export default function GameplayPage({ params }) {
     setShowExplanation(true);
   };
 
+
+
+  // Handle hint usage
+  const handleHintUsed = () => {
+    setHintsRemaining(prev => Math.max(0, prev - 1));
+    setUserStats(prev => ({
+      ...prev,
+      hintsUsed: prev.hintsUsed + 1
+    }));
+  };
+
   // Handle answer selection
   const handleAnswerSelect = (answerIndex) => {
     if (selectedAnswer !== null || showExplanation || !currentQuestion) return;
 
     setSelectedAnswer(answerIndex);
 
-    const correctAnswerIndex =
-      currentQuestion.correctIndex !== undefined
-        ? currentQuestion.correctIndex
-        : currentQuestion.correctAnswer;
+    // Calculate answer time for speed tracking
+    const answerTime = questionStartTime ? (Date.now() - questionStartTime) / 1000 : 60;
 
-    if (answerIndex === correctAnswerIndex) {
+    const correctAnswerIndex = currentQuestion.correctIndex !== undefined
+      ? currentQuestion.correctIndex
+      : currentQuestion.correctAnswer;
+
+    const isCorrect = answerIndex === correctAnswerIndex;
+    setIsAnswerCorrect(isCorrect);
+
+    if (isCorrect) {
       // Correct answer
-      setScore((prevScore) => prevScore + 100);
-      setIsAnswerCorrect(true);
+      setScore(prevScore => prevScore + 100);
+      
+      // Update streak
+      setCurrentStreak(prev => {
+        const newStreak = prev + 1;
+        setMaxStreak(current => Math.max(current, newStreak));
+        return newStreak;
+      });
+      
+      // Track fastest answer
+      setFastestAnswer(prev => Math.min(prev, answerTime));
+      
+      // Update user stats
+      setUserStats(prev => {
+        const newStats = {
+          ...prev,
+          correctAnswers: prev.correctAnswers + 1,
+          totalAnswers: prev.totalAnswers + 1,
+          maxStreak: Math.max(prev.maxStreak, currentStreak + 1),
+          fastestAnswer: Math.min(prev.fastestAnswer, answerTime)
+        };
+        console.log('Updated stats after correct answer:', newStats);
+        
+        // Check for achievements immediately
+        try {
+          const newAchievements = checkAchievements(newStats, userAchievements);
+          if (newAchievements.length > 0) {
+            setNewAchievement(newAchievements[0]);
+            setUserAchievements(prev => [...prev, ...newAchievements]);
+            console.log('🏆 Achievement earned during gameplay:', newAchievements[0]);
+          }
+        } catch (error) {
+          console.error('Error checking achievements during gameplay:', error);
+        }
+        
+        return newStats;
+      });
+      
     } else {
       // Wrong answer
-      setLives((prevLives) => {
+      setLives(prevLives => {
         const newLives = prevLives - 1;
         if (newLives <= 0) {
           setGameOver(true);
         }
         return newLives;
       });
-      setIsAnswerCorrect(false);
+      
+      // Reset streak on wrong answer
+      setCurrentStreak(0);
+      
+      // Update user stats
+      setUserStats(prev => {
+        const newStats = {
+          ...prev,
+          totalAnswers: prev.totalAnswers + 1
+        };
+        console.log('Updated stats after wrong answer:', newStats);
+        
+        // Check for achievements (like "Brave Beginner" for first attempt)
+        try {
+          const newAchievements = checkAchievements(newStats, userAchievements);
+          if (newAchievements.length > 0) {
+            setNewAchievement(newAchievements[0]);
+            setUserAchievements(prev => [...prev, ...newAchievements]);
+            console.log('🏆 Achievement earned during gameplay:', newAchievements[0]);
+          }
+        } catch (error) {
+          console.error('Error checking achievements during gameplay:', error);
+        }
+        
+        return newStats;
+      });
     }
 
     setShowExplanation(true);
@@ -358,6 +538,9 @@ export default function GameplayPage({ params }) {
       setShowExplanation(false);
       setTimeLeft(60);
       setIsAnswerCorrect(null);
+      
+      // Reset question timing for next question
+      setQuestionStartTime(Date.now());
     } else {
       // Level completed - save progress
       completedLevel();
@@ -384,25 +567,7 @@ export default function GameplayPage({ params }) {
 
   // If still loading or generating questions
   if (loading || generatingQuestions) {
-    return (
-      <div className='min-h-screen bg-gradient-to-b from-blue-300 to-purple-300 text-blue-900 flex flex-col items-center justify-center p-4'>
-        <div className='game-card p-8 text-center max-w-lg w-full'>
-          <div className='flex justify-center mb-4'>
-            <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-600'></div>
-          </div>
-          <h2 className='text-xl font-bold text-purple-700 mb-3'>
-            {generatingQuestions
-              ? 'Generating Questions...'
-              : 'Loading Level...'}
-          </h2>
-          <p className='text-blue-700'>
-            {generatingQuestions
-              ? 'Our AI is creating challenging cyber security questions just for you!'
-              : 'Getting everything ready for your cyber adventure!'}
-          </p>
-        </div>
-      </div>
-    );
+    return generatingQuestions ? <QuestionGenerationLoader /> : <LevelLoadingSpinner />;
   }
 
   // If there was an error
@@ -633,163 +798,91 @@ export default function GameplayPage({ params }) {
 
   return (
     <div className='min-h-screen bg-gradient-to-b from-blue-300 to-purple-300 text-blue-900 pb-20 relative'>
+      {/* Achievement Notification */}
+      {newAchievement && (
+        <AchievementNotification
+          achievement={newAchievement}
+          onClose={() => setNewAchievement(null)}
+        />
+      )}
+      
       {/* Decorative bubbles */}
       <div className='bubble w-20 h-20 top-20 left-10'></div>
       <div className='bubble w-16 h-16 top-40 right-10'></div>
       <div className='bubble w-24 h-24 bottom-20 left-1/3'></div>
       <div className='bubble w-12 h-12 top-1/3 right-20'></div>
 
-      {/* Header with back button and game info */}
+      {/* Header with back button */}
       <div className='container mx-auto p-4 pb-24'>
         <div className='flex justify-between items-center mb-4'>
-          <Link href='/game/levels' className='flex items-center text-blue-700'>
+          <Link href='/game/levels' className='flex items-center text-blue-700 hover:text-blue-900 transition-colors'>
             <ArrowLeftIcon className='w-5 h-5 mr-1' />
-            <span>Exit Level</span>
+            <span className="font-medium">Exit Level</span>
           </Link>
-          <div className='flex items-center gap-3'>
-            <div className='flex items-center'>
-              <StarIcon className='w-5 h-5 text-yellow-500 mr-1' />
-              <span className='font-bold'>{score}</span>
-            </div>
-            <div className='flex items-center'>{renderLives()}</div>
+          <div className="text-center">
+            <h2 className="text-lg font-bold text-purple-700">
+              Level {levelId}: {level?.title}
+            </h2>
           </div>
+          <div className="w-20"></div> {/* Spacer for centering */}
         </div>
 
-        {/* Progress bar */}
-        <div className='mb-4'>
-          <div className='flex justify-between text-sm mb-1'>
-            <span>
-              Level {levelId}: {level && level.title}
-            </span>
-            <span>
-              Question {currentQuestionIndex + 1}/{questions.length}
-            </span>
-          </div>
-          <div className='h-3 bg-blue-100 rounded-full overflow-hidden'>
-            <div
-              className='h-full bg-blue-500 rounded-full transition-all duration-300'
-              style={{ width: `${progressPercentage}%` }}
-            ></div>
-          </div>
+        {/* Enhanced Game Stats */}
+        <div className='mb-6'>
+          <GameStats
+            score={score}
+            lives={lives}
+            maxLives={3}
+            timeLeft={timeLeft}
+            hintsRemaining={hintsRemaining}
+            streak={currentStreak}
+            questionNumber={currentQuestionIndex + 1}
+            totalQuestions={questions.length}
+            compact={true}
+          />
         </div>
 
-        {/* Timer */}
-        <div className='mb-4 flex justify-end'>
-          <div
-            className={`flex items-center py-1 px-3 rounded-full ${
-              timeLeft <= 5
-                ? 'bg-red-100 text-red-700 animate-pulse'
-                : 'bg-blue-100 text-blue-700'
-            }`}
-          >
-            <ClockIcon className='w-5 h-5' />
-            <span className='font-bold'>{timeLeft}s</span>
-          </div>
-        </div>
-
-        {/* Question card */}
+        {/* Enhanced Question Card */}
         <AnimatePresence mode='wait'>
-          <motion.div
-            key={`question-${currentQuestionIndex}`}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className='game-card p-5 mb-4'
-          >
-            <h3 className='text-xl font-bold mb-4 text-blue-800'>
-              {currentQuestion?.question}
-            </h3>
+          <div key={`question-${currentQuestionIndex}`}>
+            <EnhancedQuestionCard
+              question={currentQuestion?.question}
+              options={currentQuestion?.options || []}
+              selectedAnswer={selectedAnswer}
+              correctAnswer={
+                currentQuestion?.correctIndex !== undefined
+                  ? currentQuestion.correctIndex
+                  : currentQuestion?.correctAnswer
+              }
+              showExplanation={showExplanation}
+              onAnswerSelect={handleAnswerSelect}
+              disabled={showExplanation}
+              questionNumber={currentQuestionIndex + 1}
+              totalQuestions={questions.length}
+            />
 
-            {/* Answer options */}
-            <motion.div
-              variants={containerVariants}
-              initial='hidden'
-              animate='visible'
-              className='space-y-3'
-            >
-              {currentQuestion.options.map((option, index) => {
-                const correctAnswerIndex =
-                  currentQuestion.correctIndex !== undefined
-                    ? currentQuestion.correctIndex
-                    : currentQuestion.correctAnswer;
-
-                return (
-                  <motion.button
-                    key={`option-${index}`}
-                    variants={itemVariants}
-                    onClick={() => handleAnswerSelect(index)}
-                    disabled={showExplanation}
-                    className={`w-full p-3 rounded-lg text-left transition-colors ${
-                      showExplanation
-                        ? index === correctAnswerIndex
-                          ? 'bg-green-100 border-2 border-green-500 text-green-800'
-                          : index === selectedAnswer
-                          ? 'bg-red-100 border-2 border-red-500 text-red-800'
-                          : 'bg-white text-blue-700 border border-gray-200'
-                        : selectedAnswer === index
-                        ? 'bg-blue-100 border-2 border-blue-500 text-blue-700'
-                        : 'bg-white hover:bg-blue-50 text-blue-700 border border-gray-200'
-                    }`}
-                  >
-                    <div className='flex items-center'>
-                      <div
-                        className={`w-6 h-6 rounded-full mr-3 flex items-center justify-center ${
-                          showExplanation
-                            ? index === correctAnswerIndex
-                              ? 'bg-green-500 text-white'
-                              : index === selectedAnswer
-                              ? 'bg-red-500 text-white'
-                              : 'bg-gray-200 text-gray-700'
-                            : 'bg-blue-100 text-blue-700'
-                        }`}
-                      >
-                        {['A', 'B', 'C', 'D'][index]}
-                      </div>
-                      <span>{option}</span>
-                    </div>
-                  </motion.button>
-                );
-              })}
-            </motion.div>
-
-            {/* Answer explanation */}
-            {showExplanation && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className='mt-4 p-3 rounded-lg bg-blue-50'
-              >
-                <div className='flex items-start'>
-                  {isAnswerCorrect ? (
-                    <CheckCircleIcon className='w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5' />
-                  ) : (
-                    <XCircleIcon className='w-5 h-5 text-red-500 mr-2 flex-shrink-0 mt-0.5' />
-                  )}
-                  <div>
-                    <h4
-                      className={`font-bold mb-1 ${
-                        isAnswerCorrect ? 'text-green-700' : 'text-red-700'
-                      }`}
-                    >
-                      {isAnswerCorrect ? 'Correct!' : 'Incorrect!'}
-                    </h4>
-                    <p className='text-sm text-blue-700'>
-                      {currentQuestion.explanation}
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleNextQuestion}
-                  className='mt-3 w-full py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors'
-                >
-                  {currentQuestionIndex < questions.length - 1
-                    ? 'Next Question'
-                    : 'Complete Level'}
-                </button>
-              </motion.div>
+            {/* Hint System */}
+            {!showExplanation && (
+              <div className="mt-4">
+                <HintSystem
+                  question={currentQuestion}
+                  onHintUsed={handleHintUsed}
+                  hintsRemaining={hintsRemaining}
+                  disabled={showExplanation || selectedAnswer !== null}
+                />
+              </div>
             )}
-          </motion.div>
+
+            {/* Enhanced Answer Feedback */}
+            <AnswerFeedback
+              isCorrect={isAnswerCorrect}
+              explanation={currentQuestion?.explanation}
+              streak={currentStreak}
+              points={isAnswerCorrect ? 100 : 0}
+              isVisible={showExplanation}
+              onNext={handleNextQuestion}
+            />
+          </div>
         </AnimatePresence>
       </div>
 
