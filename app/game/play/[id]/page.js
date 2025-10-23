@@ -21,6 +21,9 @@ import FeedbackButton from '../../../../components/FeedbackButton';
 import HintSystem from '../../../../components/HintSystem';
 import AchievementNotification from '../../../../components/AchievementNotification';
 import { QuestionGenerationLoader, LevelLoadingSpinner } from '../../../../components/LoadingSpinner';
+import GameStats from '../../../../components/GameStats';
+import AnswerFeedback from '../../../../components/AnswerFeedback';
+import EnhancedQuestionCard from '../../../../components/EnhancedQuestionCard';
 import {
   generateQuestionsForLevel,
   getLevelDefinitions,
@@ -724,74 +727,58 @@ export default function GameplayPage({ params }) {
       <div className='bubble w-24 h-24 bottom-20 left-1/3'></div>
       <div className='bubble w-12 h-12 top-1/3 right-20'></div>
 
-      {/* Header with back button and game info */}
+      {/* Header with back button */}
       <div className='container mx-auto p-4 pb-24'>
         <div className='flex justify-between items-center mb-4'>
-          <Link href='/game/levels' className='flex items-center text-blue-700'>
+          <Link href='/game/levels' className='flex items-center text-blue-700 hover:text-blue-900 transition-colors'>
             <ArrowLeftIcon className='w-5 h-5 mr-1' />
-            <span>Exit Level</span>
+            <span className="font-medium">Exit Level</span>
           </Link>
-          <div className='flex items-center gap-3'>
-            <div className='flex items-center'>
-              <StarIcon className='w-5 h-5 text-yellow-500 mr-1' />
-              <span className='font-bold'>{score}</span>
-            </div>
-            <div className='flex items-center gap-1'>
-              <span className='text-xs text-blue-600'>💡</span>
-              <span className='text-sm font-medium text-blue-700'>{hintsRemaining}</span>
-            </div>
-            <div className='flex items-center'>{renderLives()}</div>
+          <div className="text-center">
+            <h2 className="text-lg font-bold text-purple-700">
+              Level {levelId}: {level?.title}
+            </h2>
           </div>
+          <div className="w-20"></div> {/* Spacer for centering */}
         </div>
 
-        {/* Progress bar */}
-        <div className='mb-4'>
-          <div className='flex justify-between text-sm mb-1'>
-            <span>
-              Level {levelId}: {level && level.title}
-            </span>
-            <span>
-              Question {currentQuestionIndex + 1}/{questions.length}
-            </span>
-          </div>
-          <div className='h-3 bg-blue-100 rounded-full overflow-hidden'>
-            <div
-              className='h-full bg-blue-500 rounded-full transition-all duration-300'
-              style={{ width: `${progressPercentage}%` }}
-            ></div>
-          </div>
+        {/* Enhanced Game Stats */}
+        <div className='mb-6'>
+          <GameStats
+            score={score}
+            lives={lives}
+            maxLives={3}
+            timeLeft={timeLeft}
+            hintsRemaining={hintsRemaining}
+            streak={currentStreak}
+            questionNumber={currentQuestionIndex + 1}
+            totalQuestions={questions.length}
+            compact={true}
+          />
         </div>
 
-        {/* Timer */}
-        <div className='mb-4 flex justify-end'>
-          <div
-            className={`flex items-center py-1 px-3 rounded-full ${
-              timeLeft <= 5
-                ? 'bg-red-100 text-red-700 animate-pulse'
-                : 'bg-blue-100 text-blue-700'
-            }`}
-          >
-            <ClockIcon className='w-5 h-5' />
-            <span className='font-bold'>{timeLeft}s</span>
-          </div>
-        </div>
-
-        {/* Question card */}
+        {/* Enhanced Question Card */}
         <AnimatePresence mode='wait'>
-          <motion.div
-            key={`question-${currentQuestionIndex}`}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className='game-card p-5 mb-4'
-          >
-            <h3 className='text-xl font-bold mb-4 text-blue-800'>
-              {currentQuestion?.question}
-            </h3>
+          <div key={`question-${currentQuestionIndex}`}>
+            <EnhancedQuestionCard
+              question={currentQuestion?.question}
+              options={currentQuestion?.options || []}
+              selectedAnswer={selectedAnswer}
+              correctAnswer={
+                currentQuestion?.correctIndex !== undefined
+                  ? currentQuestion.correctIndex
+                  : currentQuestion?.correctAnswer
+              }
+              showExplanation={showExplanation}
+              onAnswerSelect={handleAnswerSelect}
+              disabled={showExplanation}
+              questionNumber={currentQuestionIndex + 1}
+              totalQuestions={questions.length}
+            />
 
             {/* Hint System */}
             {!showExplanation && (
-              <div className="mb-4">
+              <div className="mt-4">
                 <HintSystem
                   question={currentQuestion}
                   onHintUsed={handleHintUsed}
@@ -801,96 +788,16 @@ export default function GameplayPage({ params }) {
               </div>
             )}
 
-            {/* Answer options */}
-            <motion.div
-              variants={containerVariants}
-              initial='hidden'
-              animate='visible'
-              className='space-y-3'
-            >
-              {currentQuestion.options.map((option, index) => {
-                const correctAnswerIndex =
-                  currentQuestion.correctIndex !== undefined
-                    ? currentQuestion.correctIndex
-                    : currentQuestion.correctAnswer;
-
-                return (
-                  <motion.button
-                    key={`option-${index}`}
-                    variants={itemVariants}
-                    onClick={() => handleAnswerSelect(index)}
-                    disabled={showExplanation}
-                    className={`w-full p-3 rounded-lg text-left transition-colors ${
-                      showExplanation
-                        ? index === correctAnswerIndex
-                          ? 'bg-green-100 border-2 border-green-500 text-green-800'
-                          : index === selectedAnswer
-                          ? 'bg-red-100 border-2 border-red-500 text-red-800'
-                          : 'bg-white text-blue-700 border border-gray-200'
-                        : selectedAnswer === index
-                        ? 'bg-blue-100 border-2 border-blue-500 text-blue-700'
-                        : 'bg-white hover:bg-blue-50 text-blue-700 border border-gray-200'
-                    }`}
-                  >
-                    <div className='flex items-center'>
-                      <div
-                        className={`w-6 h-6 rounded-full mr-3 flex items-center justify-center ${
-                          showExplanation
-                            ? index === correctAnswerIndex
-                              ? 'bg-green-500 text-white'
-                              : index === selectedAnswer
-                              ? 'bg-red-500 text-white'
-                              : 'bg-gray-200 text-gray-700'
-                            : 'bg-blue-100 text-blue-700'
-                        }`}
-                      >
-                        {['A', 'B', 'C', 'D'][index]}
-                      </div>
-                      <span>{option}</span>
-                    </div>
-                  </motion.button>
-                );
-              })}
-            </motion.div>
-
-            {/* Answer explanation */}
-            {showExplanation && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className='mt-4 p-3 rounded-lg bg-blue-50'
-              >
-                <div className='flex items-start'>
-                  {isAnswerCorrect ? (
-                    <CheckCircleIcon className='w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5' />
-                  ) : (
-                    <XCircleIcon className='w-5 h-5 text-red-500 mr-2 flex-shrink-0 mt-0.5' />
-                  )}
-                  <div>
-                    <h4
-                      className={`font-bold mb-1 ${
-                        isAnswerCorrect ? 'text-green-700' : 'text-red-700'
-                      }`}
-                    >
-                      {isAnswerCorrect ? 'Correct!' : 'Incorrect!'}
-                    </h4>
-                    <p className='text-sm text-blue-700'>
-                      {currentQuestion.explanation}
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleNextQuestion}
-                  className='mt-3 w-full py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors'
-                >
-                  {currentQuestionIndex < questions.length - 1
-                    ? 'Next Question'
-                    : 'Complete Level'}
-                </button>
-              </motion.div>
-            )}
-          </motion.div>
+            {/* Enhanced Answer Feedback */}
+            <AnswerFeedback
+              isCorrect={isAnswerCorrect}
+              explanation={currentQuestion?.explanation}
+              streak={currentStreak}
+              points={isAnswerCorrect ? 100 : 0}
+              isVisible={showExplanation}
+              onNext={handleNextQuestion}
+            />
+          </div>
         </AnimatePresence>
       </div>
 

@@ -16,6 +16,8 @@ import {
 import { motion } from 'framer-motion';
 import { useAuth } from '../../../context/AuthContext';
 import FeedbackButton from '../../../components/FeedbackButton';
+import EnhancedLevelCard from '../../../components/EnhancedLevelCard';
+import { AnimatedProgressBar } from '../../../components/ProgressIndicators';
 import { db } from '../../../lib/firebase';
 import {
   collection,
@@ -268,21 +270,18 @@ export default function LevelsPage() {
             </div>
           </div>
 
-          {/* Progress bar */}
+          {/* Enhanced Progress bar */}
           <div className='mt-3'>
-            <div className='flex justify-between text-xs text-blue-700 mb-1'>
-              <span>
-                Levels Unlocked: {progressStats.unlockedCount}/{levels.length}
-              </span>
-              <span>
-                Completed: {progressStats.completedCount}/{levels.length}
-              </span>
-            </div>
-            <div className='h-3 bg-blue-100 rounded-full overflow-hidden'>
-              <div
-                className='h-full bg-gradient-to-r from-blue-400 to-purple-500 rounded-full'
-                style={{ width: `${progressStats.progressPercentage}%` }}
-              ></div>
+            <AnimatedProgressBar
+              progress={progressStats.completedCount}
+              total={levels.length}
+              label="Overall Progress"
+              color="purple"
+              size="medium"
+            />
+            <div className='flex justify-between text-xs text-gray-600 mt-2'>
+              <span>Unlocked: {progressStats.unlockedCount}/{levels.length}</span>
+              <span>Completed: {progressStats.completedCount}/{levels.length}</span>
             </div>
           </div>
         </div>
@@ -295,95 +294,18 @@ export default function LevelsPage() {
         animate='visible'
         className='px-4'
       >
-        <div className='grid grid-cols-2 gap-3'>
+        <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
           {levels.map((level) => (
             <motion.div
               key={level.id}
               variants={itemVariants}
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.98 }}
-              className='game-card overflow-hidden shadow-md'
             >
-              <div
-                className={`bg-gradient-to-r ${level.color} p-3 text-white relative`}
-              >
-                <div className='flex justify-between items-center'>
-                  <span className='text-3xl drop-shadow-md'>{level.icon}</span>
-                  <div className='bg-white bg-opacity-20 rounded-full p-1.5'>
-                    {level.unlocked ? (
-                      <LockOpenIcon className='w-4 h-4 text-white' />
-                    ) : (
-                      <LockClosedIcon className='w-4 h-4 text-white' />
-                    )}
-                  </div>
-                </div>
-                <h2 className='text-sm font-bold mt-2 line-clamp-1'>
-                  {level.title}
-                </h2>
-              </div>
-
-              <div className='p-3 flex flex-col'>
-                <p className='text-blue-700 mb-2 flex-grow text-xs line-clamp-2'>
-                  {level.description}
-                </p>
-
-                <div className='flex justify-between items-center text-xs mb-2'>
-                  <div className='flex'>
-                    <StarIcon
-                      className={`w-3 h-3 ${
-                        level.difficulty === 'Easy' ||
-                        level.difficulty === 'Medium' ||
-                        level.difficulty === 'Hard'
-                          ? 'text-yellow-400'
-                          : 'text-gray-300'
-                      }`}
-                    />
-                    <StarIcon
-                      className={`w-3 h-3 ${
-                        level.difficulty === 'Medium' ||
-                        level.difficulty === 'Hard'
-                          ? 'text-yellow-400'
-                          : 'text-gray-300'
-                      }`}
-                    />
-                    <StarIcon
-                      className={`w-3 h-3 ${
-                        level.difficulty === 'Hard'
-                          ? 'text-yellow-400'
-                          : 'text-gray-300'
-                      }`}
-                    />
-                  </div>
-                  <div className='text-purple-700 font-semibold'>
-                    {level.points} pts
-                  </div>
-                </div>
-
-                {level.unlocked ? (
-                  <>
-                    {level.completed && (
-                      <div className='flex justify-between text-xs mb-2'>
-                        <span className='text-green-600 font-semibold flex items-center'>
-                          <CheckIcon className='w-3 h-3 mr-1' />
-                          Completed
-                        </span>
-                        <span className='text-blue-600 font-semibold'>
-                          {level.userScore || 0} pts
-                        </span>
-                      </div>
-                    )}
-                    <Link href={`/game/play/${level.id}`}>
-                      <button className='btn-primary w-full py-1.5 text-xs'>
-                        {level.completed ? 'Play Again' : 'Play Now'}
-                      </button>
-                    </Link>
-                  </>
-                ) : (
-                  <button className='bg-gray-200 text-gray-500 py-1.5 px-3 rounded-full w-full cursor-not-allowed font-bold text-xs'>
-                    Locked
-                  </button>
-                )}
-              </div>
+              <EnhancedLevelCard
+                level={level}
+                isUnlocked={level.unlocked}
+                isCompleted={level.completed}
+                userScore={level.userScore}
+              />
             </motion.div>
           ))}
         </div>

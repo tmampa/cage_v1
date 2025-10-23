@@ -3,10 +3,20 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ShieldCheckIcon, TrophyIcon, UserIcon } from "@heroicons/react/24/solid";
+import { 
+  ShieldCheckIcon, 
+  TrophyIcon, 
+  UserIcon,
+  PlayIcon,
+  AcademicCapIcon,
+  LightBulbIcon,
+  StarIcon
+} from "@heroicons/react/24/solid";
 import { useAuth } from "../context/AuthContext";
 import { useRouter } from "next/navigation";
 import FeedbackButton from "../components/FeedbackButton";
+import EnhancedButton from "../components/EnhancedButton";
+import { AnimatedProgressBar } from "../components/ProgressIndicators";
 
 export default function Home() {
   const { user, userProfile, signOut } = useAuth();
@@ -108,24 +118,129 @@ export default function Home() {
           </p>
         </motion.div>
 
+        {/* User Progress Section for Logged In Users */}
+        {user && userProfile && (
+          <motion.div
+            initial={{ y: 30, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
+            className="mb-8 max-w-md mx-auto"
+          >
+            <div className="game-card p-6 text-center">
+              <div className="flex items-center justify-center mb-4">
+                <div className="bg-purple-100 rounded-full p-3 mr-3">
+                  <span className="text-3xl">{userProfile.avatar_emoji || "👤"}</span>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-purple-700">
+                    Welcome back, {userProfile.username}!
+                  </h3>
+                  <p className="text-blue-600">Score: {userProfile.score || 0} points</p>
+                </div>
+              </div>
+              
+              {/* Quick stats */}
+              <div className="grid grid-cols-3 gap-4 mb-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">6</div>
+                  <div className="text-xs text-gray-600">Levels</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    {Math.floor((userProfile.score || 0) / 100)}
+                  </div>
+                  <div className="text-xs text-gray-600">Completed</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-purple-600">
+                    {userProfile.score || 0}
+                  </div>
+                  <div className="text-xs text-gray-600">Points</div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Action Buttons */}
         <motion.div
           initial={{ y: 50, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.3, duration: 0.5 }}
-          className="flex flex-col sm:flex-row gap-4"
+          transition={{ delay: user ? 0.5 : 0.3, duration: 0.5 }}
+          className="flex flex-col sm:flex-row gap-4 justify-center"
         >
           <Link href={user ? "/game/levels" : "/auth/register"}>
-            <button className="btn-primary">
-              {user ? "Start Adventure!" : "Join Now!"}
-            </button>
+            <EnhancedButton 
+              variant="primary" 
+              size="large"
+              icon={user ? <PlayIcon className="w-5 h-5" /> : <AcademicCapIcon className="w-5 h-5" />}
+            >
+              {user ? "Continue Learning!" : "Start Learning!"}
+            </EnhancedButton>
           </Link>
+          
           <Link href="/leaderboard">
-            <button className="btn-secondary flex items-center justify-center">
-              <TrophyIcon className="h-5 w-5 mr-2" />
+            <EnhancedButton 
+              variant="secondary" 
+              size="large"
+              icon={<TrophyIcon className="w-5 h-5" />}
+            >
               Leaderboard
-            </button>
+            </EnhancedButton>
           </Link>
         </motion.div>
+
+        {/* Features Section for New Users */}
+        {!user && (
+          <motion.div
+            initial={{ y: 50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.5, duration: 0.5 }}
+            className="mt-12 max-w-4xl mx-auto"
+          >
+            <h2 className="text-2xl font-bold text-center text-purple-700 mb-8">
+              Why Choose CagE?
+            </h2>
+            
+            <div className="grid md:grid-cols-3 gap-6">
+              {[
+                {
+                  icon: <ShieldCheckIcon className="w-8 h-8 text-blue-500" />,
+                  title: "Learn by Playing",
+                  description: "Master cybersecurity through fun, interactive games and challenges."
+                },
+                {
+                  icon: <LightBulbIcon className="w-8 h-8 text-yellow-500" />,
+                  title: "Smart Hints",
+                  description: "Get helpful hints when you're stuck to keep learning without frustration."
+                },
+                {
+                  icon: <StarIcon className="w-8 h-8 text-purple-500" />,
+                  title: "Track Progress",
+                  description: "Earn points, unlock achievements, and see your cybersecurity knowledge grow."
+                }
+              ].map((feature, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ y: 30, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.6 + index * 0.1, duration: 0.5 }}
+                  className="game-card p-6 text-center hover:shadow-xl transition-shadow"
+                >
+                  <div className="flex justify-center mb-4">
+                    {feature.icon}
+                  </div>
+                  <h3 className="text-lg font-bold text-gray-800 mb-2">
+                    {feature.title}
+                  </h3>
+                  <p className="text-gray-600 text-sm leading-relaxed">
+                    {feature.description}
+                  </p>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        )}
         
         {!user && (
           <motion.p 
