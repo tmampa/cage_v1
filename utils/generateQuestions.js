@@ -148,63 +148,36 @@ function createPromptForLevel(level) {
   const levelId = level.id;
   const levelTitle = level.title;
 
-  return `
-  You are creating questions for LEVEL ${levelId} ONLY: "${levelTitle}".
-  
-  CRITICAL: These questions must be COMPLETELY DIFFERENT from questions in other levels.
-  
-  Generate ${count} unique multiple-choice questions EXCLUSIVELY about ${topics}.
-  ${focusAreas ? `SPECIFIC FOCUS AREAS: ${focusAreas}` : ""}
-  
-  LEVEL-SPECIFIC REQUIREMENTS:
-  - Level 1 (Cyber Security Basics): Focus on general internet safety, basic security concepts
-  - Level 2 (Password Protection): Focus ONLY on passwords, password managers, credential security
-  - Level 3 (Phishing Attacks): Focus ONLY on phishing emails, suspicious links, social engineering
-  - Level 4 (Safe Web Browsing): Focus ONLY on browser security, safe websites, download safety
-  - Level 5 (Social Media Safety): Focus ONLY on privacy settings, information sharing, social media scams
-  - Level 6 (Malware Defense): Focus ONLY on malware types, virus protection, infection prevention
-  
-  For Level ${levelId} ("${levelTitle}"), create questions that are:
-  1. EXCLUSIVELY about ${topics}
-  2. At ${difficulty} difficulty level
-  3. NEVER overlap with content from other levels
-  4. Completely unique and specific to this level's theme
-  5. Include real-world scenarios related to ${topics}
-  ${focusAreas ? `6. Must cover these specific areas: ${focusAreas}` : ""}
-  
-  STRICT REQUIREMENTS:
-  - Make each question scenario-based and practical
-  - Ensure correct answers are randomly distributed across A, B, C, D options
-  - Include detailed explanations
-  - NO generic cyber security questions - be specific to ${topics}
-  ${
-    focusAreas
-      ? `- Each question should relate to one of these focus areas: ${focusAreas}`
-      : ""
+  return `Generate EXACTLY ${count} cybersecurity questions for "${levelTitle}".
+
+TOPIC: ${topics}
+DIFFICULTY: ${difficulty}
+${focusAreas ? `FOCUS AREAS: ${focusAreas}` : ""}
+
+REQUIREMENTS:
+1. Create EXACTLY ${count} questions (no more, no less)
+2. Each question must have 4 multiple choice options (A, B, C, D)
+3. Questions must be about: ${topics}
+4. Difficulty level: ${difficulty}
+5. Include practical, real-world scenarios
+6. Provide clear explanations for correct answers
+
+EXAMPLE FORMAT:
+[
+  {
+    "question": "What is the most important rule for basic internet safety?",
+    "options": [
+      "Share passwords with trusted friends",
+      "Never give personal information to strangers online", 
+      "Always click on interesting links",
+      "Use the same password everywhere"
+    ],
+    "correctIndex": 1,
+    "explanation": "Never sharing personal information with strangers online is a fundamental internet safety rule that protects you from identity theft and scams."
   }
-  
-  CRITICAL: Return ONLY valid JSON array, no additional text or formatting.
-  
-  Format as JSON array (no markdown, no extra text):
-  [
-    {
-      "question": "Specific scenario about ${topics}",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
-      "correctIndex": 0,
-      "explanation": "Detailed explanation specific to ${topics}"
-    }
-  ]
-  
-  IMPORTANT: 
-  - Return ONLY the JSON array
-  - No markdown code blocks
-  - No additional explanatory text
-  - Ensure all strings are properly escaped
-  - correctIndex must be 0, 1, 2, or 3
-  
-  REMEMBER: This is Level ${levelId} about ${topics} ONLY. Do not include content from other levels.
-  ${focusAreas ? `Focus specifically on: ${focusAreas}` : ""}
-  `;
+]
+
+Generate EXACTLY ${count} questions following this format. Return only the JSON array with no additional text or markdown.`;
 }
 
 /**
@@ -276,12 +249,12 @@ export async function generateQuestionsForLevel(levelId) {
 
         // Configure model for better JSON output - using stable model
         const model = genAI.getGenerativeModel({
-          model: "gemini-2.5-flash", // More stable than experimental versions
+          model: "gemini-2.5-flash", // Most stable model
           generationConfig: {
-            temperature: 0.7, // Balanced creativity and consistency
-            topP: 0.9,
-            topK: 40,
-            maxOutputTokens: 3000, // Increased for longer responses
+            temperature: 0.5, // Lower temperature for more consistent output
+            topP: 0.8,
+            topK: 20,
+            maxOutputTokens: 4000, // Increased for longer responses
             candidateCount: 1, // Single response for consistency
           },
         });
@@ -298,10 +271,17 @@ export async function generateQuestionsForLevel(levelId) {
                 retryCount + 1
               }/${maxRetries}`
             );
+            console.log(
+              `Requesting ${level.questionsCount} questions for: ${level.title}`
+            );
 
             result = await model.generateContent(prompt);
             response = await result.response;
             text = response.text();
+
+            console.log(
+              `Received response length: ${text?.length || 0} characters`
+            );
 
             if (text && text.trim().length > 0) {
               break; // Success, exit retry loop
@@ -359,6 +339,11 @@ export async function generateQuestionsForLevel(levelId) {
         // Try to parse the JSON response with multiple attempts
         try {
           questions = JSON.parse(cleanedText);
+          console.log(
+            `Successfully parsed ${
+              questions?.length || 0
+            } questions from AI response`
+          );
         } catch (jsonError) {
           console.error(`JSON parse error for level ${levelId}:`, jsonError);
           console.log("Raw response:", text);
@@ -401,9 +386,92 @@ export async function generateQuestionsForLevel(levelId) {
 
         // Ensure we have the expected number of questions
         if (questions.length < level.questionsCount) {
-          throw new Error(
-            `Insufficient questions generated for level ${levelId}. Expected ${level.questionsCount}, got ${questions.length}`
+          console.warn(
+            `Insufficient questions generated for level ${levelId}. Expected ${level.questionsCount}, got ${questions.length}. Retrying...`
           );
+
+          // Try to generate additional questions to meet the requirement
+          const additionalNeeded = level.questionsCount - questions.length;
+          console.log(
+            `Attempting to generate ${additionalNeeded} additional questions...`
+          );
+
+          try {
+            const additionalPrompt = `Generate EXACTLY ${additionalNeeded} more cybersecurity questions for "${
+              level.title
+            }".
+
+TOPIC: ${level.topics.join(", ")}
+DIFFICULTY: ${level.difficulty}
+
+These questions should be DIFFERENT from any previous questions but still about the same topic.
+Return only the JSON array with ${additionalNeeded} questions, no additional text.`;
+
+            const additionalResult = await model.generateContent(
+              additionalPrompt
+            );
+            const additionalResponse = await additionalResult.response;
+            const additionalText = additionalResponse.text();
+
+            // Clean and parse additional questions
+            let cleanedAdditionalText = additionalText;
+            if (additionalText.includes("```json")) {
+              cleanedAdditionalText = additionalText.replace(
+                /```json\s*\n?|\n?\s*```/g,
+                ""
+              );
+            } else if (additionalText.includes("```")) {
+              cleanedAdditionalText = additionalText.replace(
+                /```\s*\n?|\n?\s*```/g,
+                ""
+              );
+            }
+
+            const jsonMatch = cleanedAdditionalText.match(/\[[\s\S]*\]/);
+            if (jsonMatch) {
+              cleanedAdditionalText = jsonMatch[0];
+            }
+
+            cleanedAdditionalText = cleanedAdditionalText
+              .trim()
+              .replace(/^\s*[\r\n]+|[\r\n]+\s*$/g, "")
+              .replace(/,\s*}/g, "}")
+              .replace(/,\s*]/g, "]");
+
+            const additionalQuestions = JSON.parse(cleanedAdditionalText);
+
+            if (
+              Array.isArray(additionalQuestions) &&
+              additionalQuestions.length > 0
+            ) {
+              questions = questions.concat(additionalQuestions);
+              console.log(
+                `Successfully added ${additionalQuestions.length} additional questions. Total: ${questions.length}`
+              );
+            }
+          } catch (additionalError) {
+            console.error(
+              "Failed to generate additional questions:",
+              additionalError
+            );
+          }
+
+          // Final check - if still insufficient, create simple fallback questions
+          if (questions.length < level.questionsCount) {
+            console.warn(
+              `Still insufficient questions. Creating fallback questions...`
+            );
+            const stillNeeded = level.questionsCount - questions.length;
+
+            for (let i = 0; i < stillNeeded; i++) {
+              const fallbackQuestion = createFallbackQuestion(level, i + 1);
+              questions.push(fallbackQuestion);
+            }
+
+            console.log(
+              `Added ${stillNeeded} fallback questions. Total: ${questions.length}`
+            );
+          }
         }
 
         // Shuffle the options for each question to further randomize correct answers
@@ -525,6 +593,95 @@ export async function generateAllLevelQuestions() {
   }
 
   return allQuestions;
+}
+
+/**
+ * Creates a simple fallback question when AI generation fails
+ * @param {Object} level - The level definition
+ * @param {number} questionNumber - The question number for variety
+ * @returns {Object} - A fallback question object
+ */
+function createFallbackQuestion(level, questionNumber) {
+  const fallbackQuestions = {
+    1: [
+      // Cyber Security Basics
+      {
+        question: "What is the most important rule when using the internet?",
+        options: [
+          "Share your password with friends",
+          "Never give personal information to strangers",
+          "Click on all interesting links",
+          "Use public WiFi for banking",
+        ],
+        correctIndex: 1,
+        explanation:
+          "Never sharing personal information with strangers online is a fundamental internet safety rule.",
+      },
+      {
+        question: "What should you do if you receive a suspicious email?",
+        options: [
+          "Open all attachments to check them",
+          "Forward it to all your friends",
+          "Delete it without opening attachments",
+          "Reply asking for more information",
+        ],
+        correctIndex: 2,
+        explanation:
+          "Deleting suspicious emails without opening attachments protects you from malware and scams.",
+      },
+      {
+        question: "Why is it important to keep your software updated?",
+        options: [
+          "To get new features only",
+          "To fix security vulnerabilities",
+          "To make your computer slower",
+          "Updates are not important",
+        ],
+        correctIndex: 1,
+        explanation:
+          "Software updates often include security patches that protect against new threats.",
+      },
+    ],
+    2: [
+      // Password Protection
+      {
+        question: "What makes a password strong?",
+        options: [
+          "Using your birthday",
+          "Using the same password everywhere",
+          "Mixing letters, numbers, and symbols",
+          "Using only lowercase letters",
+        ],
+        correctIndex: 2,
+        explanation:
+          "Strong passwords combine uppercase and lowercase letters, numbers, and special symbols.",
+      },
+    ],
+    3: [
+      // Phishing Attacks
+      {
+        question: "What is a common sign of a phishing email?",
+        options: [
+          "Perfect spelling and grammar",
+          "Urgent requests for personal information",
+          "Emails from known contacts",
+          "Professional email signatures",
+        ],
+        correctIndex: 1,
+        explanation:
+          "Phishing emails often create urgency to trick people into sharing personal information quickly.",
+      },
+    ],
+  };
+
+  const levelQuestions = fallbackQuestions[level.id] || fallbackQuestions[1];
+  const questionIndex = (questionNumber - 1) % levelQuestions.length;
+
+  return {
+    ...levelQuestions[questionIndex],
+    levelId: level.id,
+    isFallback: true,
+  };
 }
 
 /**
