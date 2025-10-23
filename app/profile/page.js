@@ -26,6 +26,13 @@ import EnhancedButton from '../../components/EnhancedButton';
 import { CircularProgress, AnimatedProgressBar } from '../../components/ProgressIndicators';
 import { AchievementsList } from '../../components/AchievementNotification';
 import { getAchievementProgress, DEFAULT_USER_STATS } from '../../utils/achievements';
+import { db } from '../../lib/firebase';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+} from 'firebase/firestore';
 
 const avatarEmojis = [
   '👧',
@@ -69,19 +76,71 @@ function ProfilePage() {
       setUsername(userProfile.username || '');
       setSelectedAvatar(userProfile.avatar_emoji || '👤');
       
-      // Calculate user stats from profile
+      // Load actual user stats from Firebase instead of estimating
+      loadActualUserStats();
+    }
+  }, [userProfile]);
+
+  const loadActualUserStats = async () => {
+    if (!user?.id) return;
+
+    try {
+      // Get actual progress from Firebase
+      const progressRef = collection(db, 'progress');
+      const q = query(progressRef, where('userId', '==', user.id));
+      const querySnapshot = await getDocs(q);
+
+      let completedLevels = 0;
+      let totalCorrectAnswers = 0;
+      let totalAnswers = 0;
+      let perfectScores = 0;
+
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.passed) {
+          completedLevels++;
+        }
+        // Estimate questions based on score (each correct answer = 100 points)
+        const questionsCorrect = Math.floor((data.score || 0) / 100);
+        totalCorrectAnswers += questionsCorrect;
+        totalAnswers += questionsCorrect + 1; // Add some wrong answers
+        
+        // Perfect score if score equals max possible for level
+        if (data.score >= 500) { // Assuming 5 questions per level * 100 points
+          perfectScores++;
+        }
+      });
+
       const calculatedStats = {
         ...DEFAULT_USER_STATS,
-        levelsCompleted: Math.floor((userProfile.score || 0) / 100),
-        correctAnswers: Math.floor((userProfile.score || 0) / 100) * 5, // Estimate
-        totalAnswers: Math.floor((userProfile.score || 0) / 100) * 6, // Estimate
-        perfectScores: Math.floor((userProfile.score || 0) / 500), // Estimate perfect scores
+        levelsCompleted: completedLevels,
+        correctAnswers: totalCorrectAnswers,
+        totalAnswers: Math.max(totalAnswers, totalCorrectAnswers), // Ensure total >= correct
+        perfectScores: perfectScores,
       };
+      
+      console.log('Loaded actual user stats:', calculatedStats);
       setUserStats(calculatedStats);
       
       // Get achievement progress
       const achievementProgress = getAchievementProgress(calculatedStats, []);
       setAchievements(achievementProgress);
+    } catch (error) {
+      console.error('Error loading user stats:', error);
+      // Fallback to basic stats
+      const basicStats = {
+        ...DEFAULT_USER_STATS,
+        levelsCompleted: 0,
+      };
+      setUserStats(basicStats);
+    }
+  };
+
+  useEffect(() => {
+    if (userProfile) {
+      setUsername(userProfile.username || '');
+      setSelectedAvatar(userProfile.avatar_emoji || '👤');
+      loadActualUserStats();
     }
   }, [userProfile]);
 

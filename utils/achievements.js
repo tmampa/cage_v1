@@ -9,6 +9,22 @@ export const ACHIEVEMENTS = {
     points: 50,
     condition: (stats) => stats.levelsCompleted >= 1
   },
+  FIRST_QUESTION: {
+    id: 'first_question',
+    title: 'Getting Started',
+    description: 'Answer your first question correctly',
+    icon: '🎯',
+    points: 25,
+    condition: (stats) => stats.correctAnswers >= 1
+  },
+  BRAVE_BEGINNER: {
+    id: 'brave_beginner',
+    title: 'Brave Beginner',
+    description: 'Start your cybersecurity journey',
+    icon: '🚀',
+    points: 10,
+    condition: (stats) => stats.totalAnswers >= 1
+  },
   PERFECT_SCORE: {
     id: 'perfect_score',
     title: 'Perfect Score',
@@ -93,13 +109,21 @@ export function checkAchievements(userStats, currentAchievements = []) {
   const currentAchievementIds = currentAchievements.map(a => a.id);
   const newAchievements = [];
 
+  console.log('Checking achievements with stats:', userStats);
+  console.log('Current achievement IDs:', currentAchievementIds);
+
   Object.values(ACHIEVEMENTS).forEach(achievement => {
-    if (!currentAchievementIds.includes(achievement.id) && 
-        achievement.condition(userStats)) {
+    const alreadyHas = currentAchievementIds.includes(achievement.id);
+    const meetsCondition = achievement.condition(userStats);
+    
+    console.log(`Achievement ${achievement.id}: already has = ${alreadyHas}, meets condition = ${meetsCondition}`);
+    
+    if (!alreadyHas && meetsCondition) {
       newAchievements.push({
         ...achievement,
         earnedAt: new Date().toISOString()
       });
+      console.log(`🏆 New achievement earned: ${achievement.title}`);
     }
   });
 

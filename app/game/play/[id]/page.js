@@ -161,6 +161,7 @@ export default function GameplayPage({ params }) {
   const [fastestAnswer, setFastestAnswer] = useState(Infinity);
   const [newAchievement, setNewAchievement] = useState(null);
   const [userStats, setUserStats] = useState(DEFAULT_USER_STATS);
+  const [userAchievements, setUserAchievements] = useState([]);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [showExplanation, setShowExplanation] = useState(false);
   const [gameOver, setGameOver] = useState(false);
@@ -254,6 +255,36 @@ export default function GameplayPage({ params }) {
         setMaxStreak(0);
         setFastestAnswer(Infinity);
         setQuestionStartTime(Date.now());
+
+        // Initialize user stats based on actual progress
+        if (user?.id && userProfile) {
+          const currentScore = userProfile.score || 0;
+          const estimatedLevelsCompleted = Math.floor(currentScore / 100); // Rough estimate
+          const estimatedCorrectAnswers = estimatedLevelsCompleted * 5; // Estimate 5 questions per level
+          
+          const initialStats = {
+            ...DEFAULT_USER_STATS,
+            levelsCompleted: estimatedLevelsCompleted,
+            correctAnswers: estimatedCorrectAnswers,
+            totalAnswers: estimatedCorrectAnswers + Math.floor(estimatedCorrectAnswers * 0.2), // Add some wrong answers
+            perfectScores: Math.floor(estimatedLevelsCompleted * 0.3), // Estimate some perfect scores
+          };
+          
+          setUserStats(initialStats);
+          console.log('Initialized user stats:', initialStats);
+
+          // Load existing achievements from localStorage
+          try {
+            const savedAchievements = localStorage.getItem(`achievements_${user.id}`);
+            if (savedAchievements) {
+              const achievements = JSON.parse(savedAchievements);
+              setUserAchievements(achievements);
+              console.log('Loaded existing achievements:', achievements);
+            }
+          } catch (storageError) {
+            console.warn('Could not load achievements from localStorage:', storageError);
+          }
+        }
       } catch (error) {
         console.error('Error loading level:', error);
         setError(`Failed to load level: ${error.message}`);
@@ -292,13 +323,31 @@ export default function GameplayPage({ params }) {
       noHintLevels: hintsRemaining === 3 && passed ? userStats.noHintLevels + 1 : userStats.noHintLevels
     };
 
+    // Update the user stats state
+    setUserStats(finalStats);
+
     // Check for new achievements
     try {
-      const newAchievements = checkAchievements(finalStats, []);
+      console.log('Checking achievements with stats:', finalStats);
+      console.log('Current user achievements:', userAchievements);
+      
+      const newAchievements = checkAchievements(finalStats, userAchievements);
       if (newAchievements.length > 0) {
         // Show the first new achievement
         setNewAchievement(newAchievements[0]);
+        // Add to user achievements
+        setUserAchievements(prev => [...prev, ...newAchievements]);
         console.log('New achievements earned:', newAchievements);
+        
+        // Save achievements to localStorage for persistence
+        try {
+          const savedAchievements = [...userAchievements, ...newAchievements];
+          localStorage.setItem(`achievements_${user?.id}`, JSON.stringify(savedAchievements));
+        } catch (storageError) {
+          console.warn('Could not save achievements to localStorage:', storageError);
+        }
+      } else {
+        console.log('No new achievements earned this time');
       }
     } catch (error) {
       console.error('Error checking achievements:', error);
@@ -374,6 +423,17 @@ export default function GameplayPage({ params }) {
     setShowExplanation(true);
   };
 
+
+
+  // Handle hint usage
+  const handleHintUsed = () => {
+    setHintsRemaining(prev => Math.max(0, prev - 1));
+    setUserStats(prev => ({
+      ...prev,
+      hintsUsed: prev.hintsUsed + 1
+    }));
+  };
+
   // Handle answer selection
   const handleAnswerSelect = (answerIndex) => {
     if (selectedAnswer !== null || showExplanation || !currentQuestion) return;
@@ -383,17 +443,18 @@ export default function GameplayPage({ params }) {
     // Calculate answer time for speed tracking
     const answerTime = questionStartTime ? (Date.now() - questionStartTime) / 1000 : 60;
 
-    const correctAnswerIndex =
-      currentQuestion.correctIndex !== undefined
-        ? currentQuestion.correctIndex
-        : currentQuestion.correctAnswer;
+    const correctAnswerIndex = currentQuestion.correctIndex !== undefined
+      ? currentQuestion.correctIndex
+      : currentQuestion.correctAnswer;
 
-    if (answerIndex === correctAnswerIndex) {
+    const isCorrect = answerIndex === correctAnswerIndex;
+    setIsAnswerCorrect(isCorrect);
+
+    if (isCorrect) {
       // Correct answer
-      setScore((prevScore) => prevScore + 100);
-      setIsAnswerCorrect(true);
+      setScore(prevScore => prevScore + 100);
       
-      // Update streak and stats
+      // Update streak
       setCurrentStreak(prev => {
         const newStreak = prev + 1;
         setMaxStreak(current => Math.max(current, newStreak));
@@ -404,45 +465,69 @@ export default function GameplayPage({ params }) {
       setFastestAnswer(prev => Math.min(prev, answerTime));
       
       // Update user stats
-      setUserStats(prev => ({
-        ...prev,
-        correctAnswers: prev.correctAnswers + 1,
-        totalAnswers: prev.totalAnswers + 1,
-        maxStreak: Math.max(prev.maxStreak, currentStreak + 1),
-        fastestAnswer: Math.min(prev.fastestAnswer, answerTime)
-      }));
+      setUserStats(prev => {
+        const newStats = {
+          ...prev,
+          correctAnswers: prev.correctAnswers + 1,
+          totalAnswers: prev.totalAnswers + 1,
+          maxStreak: Math.max(prev.maxStreak, currentStreak + 1),
+          fastestAnswer: Math.min(prev.fastestAnswer, answerTime)
+        };
+        console.log('Updated stats after correct answer:', newStats);
+        
+        // Check for achievements immediately
+        try {
+          const newAchievements = checkAchievements(newStats, userAchievements);
+          if (newAchievements.length > 0) {
+            setNewAchievement(newAchievements[0]);
+            setUserAchievements(prev => [...prev, ...newAchievements]);
+            console.log('🏆 Achievement earned during gameplay:', newAchievements[0]);
+          }
+        } catch (error) {
+          console.error('Error checking achievements during gameplay:', error);
+        }
+        
+        return newStats;
+      });
       
     } else {
       // Wrong answer
-      setLives((prevLives) => {
+      setLives(prevLives => {
         const newLives = prevLives - 1;
         if (newLives <= 0) {
           setGameOver(true);
         }
         return newLives;
       });
-      setIsAnswerCorrect(false);
       
       // Reset streak on wrong answer
       setCurrentStreak(0);
       
       // Update user stats
-      setUserStats(prev => ({
-        ...prev,
-        totalAnswers: prev.totalAnswers + 1
-      }));
+      setUserStats(prev => {
+        const newStats = {
+          ...prev,
+          totalAnswers: prev.totalAnswers + 1
+        };
+        console.log('Updated stats after wrong answer:', newStats);
+        
+        // Check for achievements (like "Brave Beginner" for first attempt)
+        try {
+          const newAchievements = checkAchievements(newStats, userAchievements);
+          if (newAchievements.length > 0) {
+            setNewAchievement(newAchievements[0]);
+            setUserAchievements(prev => [...prev, ...newAchievements]);
+            console.log('🏆 Achievement earned during gameplay:', newAchievements[0]);
+          }
+        } catch (error) {
+          console.error('Error checking achievements during gameplay:', error);
+        }
+        
+        return newStats;
+      });
     }
 
     setShowExplanation(true);
-  };
-
-  // Handle hint usage
-  const handleHintUsed = () => {
-    setHintsRemaining(prev => Math.max(0, prev - 1));
-    setUserStats(prev => ({
-      ...prev,
-      hintsUsed: prev.hintsUsed + 1
-    }));
   };
 
   // Handle next question

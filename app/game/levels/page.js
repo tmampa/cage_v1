@@ -29,6 +29,7 @@ import {
   doc,
   getDoc,
 } from 'firebase/firestore';
+import { getAchievementProgress } from '../../../utils/achievements';
 
 export default function LevelsPage() {
   const { user, userProfile } = useAuth();
@@ -114,7 +115,11 @@ export default function LevelsPage() {
     unlockedCount: 1,
     completedCount: 0,
     progressPercentage: 0,
+    completedLevels: [],
   });
+
+  // Recent achievements state
+  const [recentAchievements, setRecentAchievements] = useState([]);
 
   // New state for enhanced UI
   const [viewMode, setViewMode] = useState('map'); // 'map', 'grid'
@@ -175,7 +180,20 @@ export default function LevelsPage() {
           unlockedCount,
           completedCount,
           progressPercentage,
+          completedLevels: updatedLevels.filter(l => l.completed).map(l => l.id),
         });
+
+        // Load recent achievements from localStorage
+        const storedAchievements = localStorage.getItem(`achievements_${user.id}`);
+        if (storedAchievements) {
+          const achievements = JSON.parse(storedAchievements);
+          // Sort by earnedAt date and take the 5 most recent
+          const recent = achievements
+            .filter(a => a.earnedAt)
+            .sort((a, b) => new Date(b.earnedAt) - new Date(a.earnedAt))
+            .slice(0, 5);
+          setRecentAchievements(recent);
+        }
       } catch (error) {
         console.error('Error loading user progress:', error);
       }
@@ -328,6 +346,7 @@ export default function LevelsPage() {
           userProfile={userProfile}
           progressStats={progressStats}
           levels={levels}
+          recentAchievements={recentAchievements}
         />
 
         {/* Level Filters (only show in grid mode) */}

@@ -5,25 +5,39 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { 
   ShieldCheckIcon, 
-  TrophyIcon, 
-  UserIcon,
+  TrophyIcon,
   PlayIcon,
   AcademicCapIcon,
   LightBulbIcon,
   StarIcon
 } from "@heroicons/react/24/solid";
 import { useAuth } from "../context/AuthContext";
-import { useRouter } from "next/navigation";
 import FeedbackButton from "../components/FeedbackButton";
 import EnhancedButton from "../components/EnhancedButton";
 import { AnimatedProgressBar } from "../components/ProgressIndicators";
+import { db } from "../lib/firebase";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  getDoc,
+} from 'firebase/firestore';
 
 export default function Home() {
   const { user, userProfile, signOut } = useAuth();
-  const router = useRouter();
   
   // Create decorative bubbles
   const [bubbles, setBubbles] = useState([]);
+  
+  // Track actual level progress
+  const [levelProgress, setLevelProgress] = useState({
+    totalLevels: 6,
+    completedLevels: 0,
+    unlockedLevels: 1,
+    loading: true
+  });
 
   useEffect(() => {
     // Generate random bubbles
@@ -39,6 +53,50 @@ export default function Home() {
     }
     setBubbles(newBubbles);
   }, []);
+
+  // Load actual level progress
+  useEffect(() => {
+    const loadUserProgress = async () => {
+      if (!user?.id) {
+        setLevelProgress(prev => ({ ...prev, loading: false }));
+        return;
+      }
+
+      try {
+        // Get user's profile for highest level
+        const userRef = doc(db, 'users', user.id);
+        const userDoc = await getDoc(userRef);
+        const highestLevel = userDoc.exists() ? userDoc.data().highestLevel || 1 : 1;
+
+        // Get all progress documents for this user
+        const progressRef = collection(db, 'progress');
+        const q = query(progressRef, where('userId', '==', user.id));
+        const querySnapshot = await getDocs(q);
+
+        let completedCount = 0;
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.passed) {
+            completedCount++;
+          }
+        });
+
+        setLevelProgress({
+          totalLevels: 6,
+          completedLevels: completedCount,
+          unlockedLevels: Math.min(highestLevel + 1, 6), // Next level is unlocked
+          loading: false
+        });
+
+        console.log(`User progress: ${completedCount}/6 levels completed, ${Math.min(highestLevel + 1, 6)} unlocked`);
+      } catch (error) {
+        console.error('Error loading user progress:', error);
+        setLevelProgress(prev => ({ ...prev, loading: false }));
+      }
+    };
+
+    loadUserProgress();
+  }, [user?.id]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -142,12 +200,14 @@ export default function Home() {
               {/* Quick stats */}
               <div className="grid grid-cols-3 gap-4 mb-4">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">6</div>
-                  <div className="text-xs text-gray-600">Levels</div>
+                  <div className="text-2xl font-bold text-blue-600">
+                    {levelProgress.loading ? "..." : levelProgress.totalLevels}
+                  </div>
+                  <div className="text-xs text-gray-600">Total Levels</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-green-600">
-                    {Math.floor((userProfile.score || 0) / 100)}
+                    {levelProgress.loading ? "..." : levelProgress.completedLevels}
                   </div>
                   <div className="text-xs text-gray-600">Completed</div>
                 </div>
@@ -158,6 +218,19 @@ export default function Home() {
                   <div className="text-xs text-gray-600">Points</div>
                 </div>
               </div>
+
+              {/* Progress bar */}
+              {!levelProgress.loading && (
+                <div className="mb-4">
+                  <AnimatedProgressBar
+                    progress={levelProgress.completedLevels}
+                    total={levelProgress.totalLevels}
+                    label="Learning Progress"
+                    color="green"
+                    size="medium"
+                  />
+                </div>
+              )}
             </div>
           </motion.div>
         )}

@@ -1,17 +1,19 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import Link from 'next/link';
 import { 
   TrophyIcon, 
   StarIcon, 
   FireIcon, 
   LightBulbIcon,
   ShieldCheckIcon,
-  ClockIcon,
-  ChartBarIcon
+  ChartBarIcon,
+  PlayIcon
 } from '@heroicons/react/24/solid';
-import { CircularProgress, AnimatedProgressBar } from './ProgressIndicators';
+import { AnimatedProgressBar } from './ProgressIndicators';
+import EnhancedButton from './EnhancedButton';
 
 export default function ProgressDashboard({ 
   userProfile, 
@@ -19,6 +21,30 @@ export default function ProgressDashboard({
   levels,
   recentAchievements = []
 }) {
+  // Sample achievements for demo purposes when no real achievements are loaded
+  const sampleAchievements = [
+    {
+      id: 'first_steps',
+      title: 'First Steps',
+      description: 'Complete your first level',
+      icon: '👶',
+      points: 50,
+      earnedAt: new Date(Date.now() - 86400000).toISOString() // 1 day ago
+    },
+    {
+      id: 'brave_beginner',
+      title: 'Brave Beginner',
+      description: 'Start your cybersecurity journey',
+      icon: '🚀',
+      points: 10,
+      earnedAt: new Date(Date.now() - 172800000).toISOString() // 2 days ago
+    }
+  ];
+
+  // Use real achievements if available, otherwise show samples for completed users
+  const displayAchievements = recentAchievements.length > 0 
+    ? recentAchievements 
+    : (progressStats.completedCount > 0 ? sampleAchievements : []);
   const totalPossiblePoints = levels.reduce((sum, level) => sum + level.points, 0);
   const currentScore = userProfile?.score || 0;
   const overallProgress = Math.round((currentScore / totalPossiblePoints) * 100);
@@ -128,19 +154,50 @@ export default function ProgressDashboard({
           </h3>
           
           <div className="space-y-3">
-            <button className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-4 rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all flex items-center justify-center gap-2">
-              <ShieldCheckIcon className="w-4 h-4" />
-              Continue Learning
-            </button>
-            
-            <div className="grid grid-cols-2 gap-2">
-              <button className="bg-gray-100 text-gray-700 py-2 px-3 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors flex items-center justify-center gap-1">
-                <ChartBarIcon className="w-4 h-4" />
-                Stats
+            <Link href="/game/levels" className="block">
+              <button className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 px-4 rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg">
+                <ShieldCheckIcon className="w-4 h-4" />
+                Continue Learning
               </button>
-              <button className="bg-gray-100 text-gray-700 py-2 px-3 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors flex items-center justify-center gap-1">
-                <TrophyIcon className="w-4 h-4" />
-                Ranks
+            </Link>
+            
+            <div className="grid grid-cols-3 gap-2">
+              <Link href="/profile" className="block">
+                <button className="w-full bg-gray-100 text-gray-700 py-2 px-3 rounded-lg text-sm font-medium hover:bg-blue-100 hover:text-blue-700 transition-all flex items-center justify-center gap-1 border border-gray-200 hover:border-blue-300">
+                  <ChartBarIcon className="w-4 h-4" />
+                  Stats
+                </button>
+              </Link>
+              <Link href="/leaderboard" className="block">
+                <button className="w-full bg-gray-100 text-gray-700 py-2 px-3 rounded-lg text-sm font-medium hover:bg-yellow-100 hover:text-yellow-700 transition-all flex items-center justify-center gap-1 border border-gray-200 hover:border-yellow-300">
+                  <TrophyIcon className="w-4 h-4" />
+                  Ranks
+                </button>
+              </Link>
+              <button 
+                onClick={() => {
+                  // Find a random completed level for practice
+                  const completedLevels = levels.filter(level => 
+                    progressStats.completedLevels?.includes(level.id)
+                  );
+                  if (completedLevels.length > 0) {
+                    const randomLevel = completedLevels[Math.floor(Math.random() * completedLevels.length)];
+                    window.location.href = `/game/play/${randomLevel.id}?practice=true`;
+                  } else {
+                    // If no completed levels, go to the first unlocked level
+                    const firstUnlocked = levels.find(level => level.unlocked && !level.completed);
+                    if (firstUnlocked) {
+                      window.location.href = `/game/play/${firstUnlocked.id}`;
+                    } else {
+                      window.location.href = '/game/levels';
+                    }
+                  }
+                }}
+                className="w-full bg-gray-100 text-gray-700 py-2 px-3 rounded-lg text-sm font-medium hover:bg-green-100 hover:text-green-700 transition-all flex items-center justify-center gap-1 border border-gray-200 hover:border-green-300"
+                title={progressStats.completedCount > 0 ? "Practice a completed level" : "Start next level"}
+              >
+                <PlayIcon className="w-4 h-4" />
+                {progressStats.completedCount > 0 ? "Practice" : "Play"}
               </button>
             </div>
           </div>
@@ -158,23 +215,50 @@ export default function ProgressDashboard({
             Recent Achievements
           </h3>
           
-          {recentAchievements.length > 0 ? (
+          {displayAchievements.length > 0 ? (
             <div className="space-y-3">
-              {recentAchievements.slice(0, 3).map((achievement, index) => (
-                <div key={index} className="flex items-center gap-3 p-2 bg-yellow-50 rounded-lg">
+              {displayAchievements.slice(0, 3).map((achievement, index) => (
+                <motion.div 
+                  key={index} 
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  className="flex items-center gap-3 p-3 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border border-yellow-200 hover:shadow-sm transition-shadow"
+                >
                   <div className="text-2xl">{achievement.icon}</div>
                   <div className="flex-1">
                     <div className="font-medium text-gray-800 text-sm">{achievement.title}</div>
                     <div className="text-xs text-gray-600">{achievement.description}</div>
+                    {achievement.earnedAt && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        {new Date(achievement.earnedAt).toLocaleDateString()}
+                      </div>
+                    )}
                   </div>
-                  <div className="text-xs text-yellow-600 font-medium">+{achievement.points}</div>
-                </div>
+                  <div className="text-right">
+                    <div className="text-xs text-yellow-600 font-medium">+{achievement.points}</div>
+                    <div className="text-xs text-gray-500">points</div>
+                  </div>
+                </motion.div>
               ))}
+              
+              {displayAchievements.length > 3 && (
+                <Link href="/profile#achievements" className="block">
+                  <button className="w-full text-center py-2 text-sm text-purple-600 hover:text-purple-700 font-medium">
+                    View all achievements ({displayAchievements.length})
+                  </button>
+                </Link>
+              )}
             </div>
           ) : (
-            <div className="text-center py-6">
-              <div className="text-4xl mb-2">🏆</div>
-              <p className="text-gray-600 text-sm">Complete levels to earn achievements!</p>
+            <div className="text-center py-8">
+              <div className="text-4xl mb-3">🏆</div>
+              <p className="text-gray-600 text-sm mb-3">Complete levels to earn achievements!</p>
+              <Link href="/game/levels">
+                <button className="text-sm text-purple-600 hover:text-purple-700 font-medium">
+                  Start your first level →
+                </button>
+              </Link>
             </div>
           )}
         </motion.div>
