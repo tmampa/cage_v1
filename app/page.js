@@ -13,7 +13,7 @@ import {
 } from "@heroicons/react/24/solid";
 import { useAuth } from "../context/AuthContext";
 import { useChatbot } from "../context/ChatbotContext";
-import FeedbackButton from "../components/FeedbackButton";
+
 import EnhancedButton from "../components/EnhancedButton";
 import { AnimatedProgressBar } from "../components/ProgressIndicators";
 import { db } from "../lib/firebase";
@@ -329,8 +329,7 @@ export default function Home() {
         )}
       </div>
 
-      {/* Feedback Button */}
-      <FeedbackButton />
+
     </main>
   );
 }

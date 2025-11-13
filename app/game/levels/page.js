@@ -15,7 +15,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../../context/AuthContext';
 import { useChatbot } from '../../../context/ChatbotContext';
-import FeedbackButton from '../../../components/FeedbackButton';
+
 import EnhancedLevelCard from '../../../components/EnhancedLevelCard';
 import LevelMap from '../../../components/LevelMap';
 import ProgressDashboard from '../../../components/ProgressDashboard';
@@ -473,8 +473,7 @@ export default function LevelsPage() {
         </div>
       </div>
 
-      {/* Feedback Button */}
-      <FeedbackButton />
+
     </div>
   );
 }

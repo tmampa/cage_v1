@@ -148,8 +148,8 @@ export default function ChatbotWidget() {
         animate={{ scale: 1 }}
         transition={{ type: 'spring', stiffness: 260, damping: 20 }}
         onClick={toggleChatbot}
-        className="fixed bottom-5 right-5 w-[60px] h-[60px] rounded-full bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg hover:shadow-xl transition-shadow flex items-center justify-center z-50 group"
-        style={{ bottom: '20px', right: '20px' }}
+        className="fixed w-[60px] h-[60px] rounded-full bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg hover:shadow-xl transition-shadow flex items-center justify-center z-50 group"
+        style={{ bottom: '100px', right: '20px' }}
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.95 }}
       >

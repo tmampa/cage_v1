@@ -18,7 +18,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../../../context/AuthContext';
 import { useChatbot } from '../../../../context/ChatbotContext';
-import FeedbackButton from '../../../../components/FeedbackButton';
+
 import HintSystem from '../../../../components/HintSystem';
 import AchievementNotification from '../../../../components/AchievementNotification';
 import { QuestionGenerationLoader, LevelLoadingSpinner } from '../../../../components/LoadingSpinner';
@@ -958,8 +958,7 @@ export default function GameplayPage({ params }) {
         </div>
       </div>
 
-      {/* Feedback Button */}
-      <FeedbackButton />
+
     </div>
   );
 }
