@@ -156,7 +156,7 @@ export default function LevelsPage() {
 
         // Update levels with unlocked and completed status
         const updatedLevels = levels.map((level) => {
-          const isUnlocked = level.id <= highestLevel + 1; // Next level is always unlocked
+          const isUnlocked = level.id <= highestLevel; // Only unlock up to highest level
           const progress = userProgress.find((p) => p.levelId === level.id);
           const isCompleted = progress?.passed || false;
           const levelScore = progress?.score || 0;
