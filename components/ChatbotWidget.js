@@ -150,32 +150,127 @@ export default function ChatbotWidget() {
   // Minimized floating button
   if (!isOpen) {
     return (
-      <motion.button
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-        onClick={toggleChatbot}
-        className="fixed w-[60px] h-[60px] rounded-full bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg hover:shadow-xl transition-shadow flex items-center justify-center z-50 group"
-        style={{ bottom: '100px', right: '20px' }}
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.95 }}
-      >
-        <ChatBubbleLeftRightIcon className="w-7 h-7 text-white" />
+      <div className="fixed z-50" style={{ bottom: '100px', right: '20px' }}>
+        {/* Outer glow rings */}
+        <motion.div
+          className="absolute inset-0 rounded-full"
+          animate={{
+            scale: [1, 1.5, 1],
+            opacity: [0.3, 0, 0.3],
+          }}
+          transition={{
+            duration: 2,
+            repeat: Infinity,
+            ease: "easeOut"
+          }}
+          style={{
+            background: 'radial-gradient(circle, rgba(139, 92, 246, 0.4) 0%, transparent 70%)',
+            width: '80px',
+            height: '80px',
+            left: '-8px',
+            top: '-8px',
+          }}
+        />
         
-        {/* Notification badge */}
-        {unreadCount > 0 && (
+        <motion.button
+          initial={{ scale: 0, rotate: -180 }}
+          animate={{ 
+            scale: 1, 
+            rotate: 0,
+          }}
+          transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+          onClick={toggleChatbot}
+          className="relative w-[64px] h-[64px] rounded-full flex items-center justify-center group"
+          style={{ 
+            background: 'linear-gradient(135deg, #8B5CF6 0%, #EC4899 50%, #F59E0B 100%)',
+            boxShadow: '0 8px 32px rgba(139, 92, 246, 0.4), 0 0 0 1px rgba(255,255,255,0.1)',
+          }}
+          whileHover={{ 
+            scale: 1.1,
+            rotate: [0, -10, 10, -10, 0],
+            transition: { rotate: { duration: 0.5 } }
+          }}
+          whileTap={{ scale: 0.95 }}
+        >
+          {/* Shimmer effect */}
           <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-md"
+            className="absolute inset-0 rounded-full"
+            style={{
+              background: 'linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.3) 50%, transparent 70%)',
+            }}
+            animate={{
+              x: ['-100%', '200%'],
+            }}
+            transition={{
+              duration: 3,
+              repeat: Infinity,
+              ease: "linear"
+            }}
+          />
+          
+          {/* Icon container with bounce */}
+          <motion.div
+            className="relative z-10"
+            animate={{
+              y: [0, -3, 0],
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
           >
-            {unreadCount > 9 ? '9+' : unreadCount}
+            <ChatBubbleLeftRightIcon className="w-8 h-8 text-white filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.3)]" />
           </motion.div>
-        )}
-        
-        {/* Pulse effect */}
-        <span className="absolute inset-0 rounded-full bg-blue-400 opacity-0 group-hover:opacity-30 group-hover:animate-ping" />
-      </motion.button>
+          
+          {/* Sparkle effects */}
+          <motion.div
+            className="absolute top-2 right-2 w-2 h-2 bg-white rounded-full"
+            animate={{
+              scale: [0, 1, 0],
+              opacity: [0, 1, 0],
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              delay: 0.5,
+            }}
+          />
+          <motion.div
+            className="absolute bottom-3 left-3 w-1.5 h-1.5 bg-white rounded-full"
+            animate={{
+              scale: [0, 1, 0],
+              opacity: [0, 1, 0],
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              delay: 1,
+            }}
+          />
+          
+          {/* Notification badge */}
+          {unreadCount > 0 && (
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ 
+                scale: 1,
+                rotate: [0, 10, -10, 0],
+              }}
+              transition={{
+                rotate: {
+                  duration: 0.5,
+                  repeat: Infinity,
+                  repeatDelay: 2,
+                }
+              }}
+              className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-red-500 via-pink-500 to-orange-500 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-lg border-2 border-white"
+            >
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </motion.div>
+          )}
+        </motion.button>
+      </div>
     );
   }
 
