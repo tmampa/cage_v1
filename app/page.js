@@ -12,6 +12,7 @@ import {
   StarIcon
 } from "@heroicons/react/24/solid";
 import { useAuth } from "../context/AuthContext";
+import { useChatbot } from "../context/ChatbotContext";
 import FeedbackButton from "../components/FeedbackButton";
 import EnhancedButton from "../components/EnhancedButton";
 import { AnimatedProgressBar } from "../components/ProgressIndicators";
@@ -24,9 +25,11 @@ import {
   doc,
   getDoc,
 } from 'firebase/firestore';
+import { extractHomeContext } from "../utils/chatbotContext";
 
 export default function Home() {
   const { user, userProfile, signOut } = useAuth();
+  const { updateGameContext } = useChatbot();
   
   // Create decorative bubbles
   const [bubbles, setBubbles] = useState([]);
@@ -97,6 +100,12 @@ export default function Home() {
 
     loadUserProgress();
   }, [user?.id]);
+
+  // Update chatbot context when page loads or data changes
+  useEffect(() => {
+    const context = extractHomeContext(userProfile, levelProgress);
+    updateGameContext(context);
+  }, [userProfile, levelProgress, updateGameContext]);
 
   const handleSignOut = async () => {
     await signOut();

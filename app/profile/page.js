@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
+import { useChatbot } from '../../context/ChatbotContext';
 import { motion } from 'framer-motion';
 import {
   ArrowLeftIcon,
@@ -33,6 +34,7 @@ import {
   where,
   getDocs,
 } from 'firebase/firestore';
+import { extractProfileContext } from '../../utils/chatbotContext';
 
 const avatarEmojis = [
   '👧',
@@ -59,6 +61,7 @@ const avatarEmojis = [
 
 function ProfilePage() {
   const { user, userProfile, updateProfile, logout } = useAuth();
+  const { updateGameContext } = useChatbot();
   const router = useRouter();
 
   const [isEditing, setIsEditing] = useState(false);
@@ -143,6 +146,17 @@ function ProfilePage() {
       loadActualUserStats();
     }
   }, [userProfile]);
+
+  // Update chatbot context when profile data changes
+  useEffect(() => {
+    if (userProfile) {
+      const progressStats = {
+        completedLevels: userStats.levelsCompleted,
+      };
+      const context = extractProfileContext(userProfile, achievements, progressStats);
+      updateGameContext(context);
+    }
+  }, [userProfile, achievements, userStats, updateGameContext]);
 
   const handleSignOut = async () => {
     try {

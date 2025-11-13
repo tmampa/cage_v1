@@ -3,10 +3,8 @@ import { NextResponse } from 'next/server';
 import { checkRateLimit, RATE_LIMIT_CONFIG } from '@/utils/rateLimiter';
 import { constructSystemPrompt, formatConversationHistory } from '@/utils/chatbotPrompts';
 
-// Initialize Gemini AI
-const genAI = new GoogleGenerativeAI(
-  process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY
-);
+// Initialize Gemini AI - using the same approach as generateQuestions.js
+const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY);
 
 /**
  * Validate request body
@@ -86,8 +84,7 @@ export async function POST(request) {
     }
     
     // Check API key configuration
-    const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-    if (!apiKey) {
+    if (!process.env.NEXT_PUBLIC_GEMINI_API_KEY) {
       console.error('Gemini API key is not configured');
       return NextResponse.json(
         { error: 'Chatbot is currently unavailable. Please contact support.' },
@@ -95,38 +92,48 @@ export async function POST(request) {
       );
     }
     
-    // Get model configuration from environment or use defaults
-    const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+    // Get model configuration from environment or use defaults - using same model as generateQuestions
+    const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
     const maxTokens = parseInt(process.env.GEMINI_MAX_TOKENS || '500', 10);
     const temperature = parseFloat(process.env.GEMINI_TEMPERATURE || '0.7');
     
-    // Initialize model
+    // Initialize model with same config as generateQuestions.js
     const model = genAI.getGenerativeModel({
       model: modelName,
       generationConfig: {
-        maxOutputTokens: maxTokens,
         temperature: temperature,
+        topP: 0.8,
+        topK: 20,
+        maxOutputTokens: maxTokens,
+        candidateCount: 1,
       },
     });
     
     // Construct system prompt
     const systemPrompt = constructSystemPrompt(body.gameContext, body.action);
     
-    // Format conversation history
-    const history = formatConversationHistory(body.conversationHistory);
+    // Format conversation history as a single prompt
+    let fullPrompt = systemPrompt + '\n\n';
     
-    // Start chat session
-    const chat = model.startChat({
-      history: history,
-      systemInstruction: systemPrompt,
-    });
+    // Add conversation history to the prompt
+    if (body.conversationHistory && body.conversationHistory.length > 0) {
+      fullPrompt += 'Previous conversation:\n';
+      body.conversationHistory.slice(-10).forEach(msg => {
+        const role = msg.role === 'user' ? 'User' : 'Assistant';
+        fullPrompt += `${role}: ${msg.content}\n`;
+      });
+      fullPrompt += '\n';
+    }
     
-    // Send message with timeout
+    // Add current message
+    fullPrompt += `User: ${body.message}\n\nAssistant:`;
+    
+    // Generate response with timeout
     const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error('Request timeout')), 10000)
     );
     
-    const responsePromise = chat.sendMessage(body.message);
+    const responsePromise = model.generateContent(fullPrompt);
     
     const result = await Promise.race([responsePromise, timeoutPromise]);
     const response = await result.response;
@@ -167,11 +174,9 @@ export async function POST(request) {
  * GET handler - return API status
  */
 export async function GET() {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-  
   return NextResponse.json({
     status: 'ok',
-    configured: !!apiKey,
-    model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
+    configured: !!process.env.NEXT_PUBLIC_GEMINI_API_KEY,
+    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
   });
 }

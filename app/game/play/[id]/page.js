@@ -17,6 +17,7 @@ import {
 } from '@heroicons/react/24/solid';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../../../context/AuthContext';
+import { useChatbot } from '../../../../context/ChatbotContext';
 import FeedbackButton from '../../../../components/FeedbackButton';
 import HintSystem from '../../../../components/HintSystem';
 import AchievementNotification from '../../../../components/AchievementNotification';
@@ -35,6 +36,7 @@ import {
 import { db } from '../../../../lib/firebase';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import React from 'react';
+import { extractQuestionContext, throttle } from '../../../../utils/chatbotContext';
 
 // Save level progress to Firebase
 const saveLevelProgress = async (userId, levelId, score, passed) => {
@@ -137,6 +139,7 @@ const getLevelProgress = async (userId, levelId) => {
 export default function GameplayPage({ params }) {
   const router = useRouter();
   const { user, userProfile, updateProfile } = useAuth();
+  const { updateGameContext } = useChatbot();
 
   // Unwrap params using React.use()
   const unwrappedParams = React.use(params);
@@ -385,6 +388,37 @@ export default function GameplayPage({ params }) {
       setQuestionStartTime(Date.now());
     }
   }, [currentQuestionIndex, currentQuestion, showExplanation]);
+
+  // Update chatbot context when question changes (throttled)
+  useEffect(() => {
+    if (!loading && !generatingQuestions && currentQuestion && level) {
+      const updateContext = throttle(() => {
+        const context = extractQuestionContext(
+          level,
+          currentQuestion,
+          currentQuestionIndex,
+          questions.length,
+          score,
+          lives,
+          userProfile
+        );
+        updateGameContext(context);
+      }, 1000); // Throttle to max 1 update per second
+
+      updateContext();
+    }
+  }, [
+    currentQuestion,
+    currentQuestionIndex,
+    level,
+    questions.length,
+    score,
+    lives,
+    userProfile,
+    loading,
+    generatingQuestions,
+    updateGameContext,
+  ]);
 
   // Timer effect
   useEffect(() => {
