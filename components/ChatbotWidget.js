@@ -38,12 +38,15 @@ export default function ChatbotWidget() {
   const widgetRef = useRef(null);
   const messagesEndRef = useRef(null);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom when new messages arrive or loading state changes
   useEffect(() => {
     if (messagesEndRef.current && isOpen) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      // Use setTimeout to ensure DOM has updated
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }, 100);
     }
-  }, [messages, isOpen]);
+  }, [messages, isOpen, isLoading]);
 
   // Initialize position from context
   useEffect(() => {
