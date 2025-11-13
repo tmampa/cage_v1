@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
+import { useChatbot } from '../../context/ChatbotContext';
 import { motion } from 'framer-motion';
 import {
   ArrowLeftIcon,
@@ -33,6 +34,7 @@ import {
   where,
   getDocs,
 } from 'firebase/firestore';
+import { extractProfileContext } from '../../utils/chatbotContext';
 
 const avatarEmojis = [
   '👧',
@@ -144,6 +146,7 @@ function ProfilePage() {
     }
   }, [userProfile]);
 
+  // Update chatbot context when profile data changes
   const handleSignOut = async () => {
     try {
       await logout();

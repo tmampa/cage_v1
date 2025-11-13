@@ -15,10 +15,12 @@ import {
 } from '@heroicons/react/24/solid';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
+import { useChatbot } from '../../context/ChatbotContext';
 import { getFirebaseLeaderboardData } from '../../lib/firebase';
-import FeedbackButton from '../../components/FeedbackButton';
+
 import EnhancedButton from '../../components/EnhancedButton';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import { extractLeaderboardContext } from '../../utils/chatbotContext';
 
 export default function LeaderboardPage() {
   const { user, userProfile } = useAuth();
@@ -410,8 +412,7 @@ export default function LeaderboardPage() {
         </div>
       </div>
 
-      {/* Feedback Button */}
-      <FeedbackButton />
+
     </div>
   );
 }

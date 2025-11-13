@@ -12,7 +12,8 @@ import {
   StarIcon
 } from "@heroicons/react/24/solid";
 import { useAuth } from "../context/AuthContext";
-import FeedbackButton from "../components/FeedbackButton";
+import { useChatbot } from "../context/ChatbotContext";
+
 import EnhancedButton from "../components/EnhancedButton";
 import { AnimatedProgressBar } from "../components/ProgressIndicators";
 import { db } from "../lib/firebase";
@@ -24,6 +25,7 @@ import {
   doc,
   getDoc,
 } from 'firebase/firestore';
+import { extractHomeContext } from "../utils/chatbotContext";
 
 export default function Home() {
   const { user, userProfile, signOut } = useAuth();
@@ -327,8 +329,7 @@ export default function Home() {
         )}
       </div>
 
-      {/* Feedback Button */}
-      <FeedbackButton />
+
     </main>
   );
 }

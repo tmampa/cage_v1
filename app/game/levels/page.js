@@ -14,7 +14,8 @@ import {
 } from '@heroicons/react/24/solid';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../../context/AuthContext';
-import FeedbackButton from '../../../components/FeedbackButton';
+import { useChatbot } from '../../../context/ChatbotContext';
+
 import EnhancedLevelCard from '../../../components/EnhancedLevelCard';
 import LevelMap from '../../../components/LevelMap';
 import ProgressDashboard from '../../../components/ProgressDashboard';
@@ -30,6 +31,7 @@ import {
   getDoc,
 } from 'firebase/firestore';
 import { getAchievementProgress } from '../../../utils/achievements';
+import { extractLevelsContext, throttle } from '../../../utils/chatbotContext';
 
 export default function LevelsPage() {
   const { user, userProfile } = useAuth();
@@ -154,7 +156,7 @@ export default function LevelsPage() {
 
         // Update levels with unlocked and completed status
         const updatedLevels = levels.map((level) => {
-          const isUnlocked = level.id <= highestLevel + 1; // Next level is always unlocked
+          const isUnlocked = level.id <= highestLevel; // Only unlock up to highest level
           const progress = userProgress.find((p) => p.levelId === level.id);
           const isCompleted = progress?.passed || false;
           const levelScore = progress?.score || 0;
@@ -173,7 +175,7 @@ export default function LevelsPage() {
         const unlockedCount = updatedLevels.filter((l) => l.unlocked).length;
         const completedCount = updatedLevels.filter((l) => l.completed).length;
         const progressPercentage = Math.round(
-          (completedCount / levels.length) * 100
+          (completedCount / updatedLevels.length) * 100
         );
 
         setProgressStats({
@@ -471,8 +473,7 @@ export default function LevelsPage() {
         </div>
       </div>
 
-      {/* Feedback Button */}
-      <FeedbackButton />
+
     </div>
   );
 }

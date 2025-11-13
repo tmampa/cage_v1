@@ -55,7 +55,7 @@ export default function ProgressDashboard({
     : (progressStats.completedCount > 0 ? sampleAchievements : []);
   const totalPossiblePoints = levels.reduce((sum, level) => sum + level.points, 0);
   const currentScore = userProfile?.score || 0;
-  const overallProgress = Math.round((currentScore / totalPossiblePoints) * 100);
+  const overallProgress = Math.round((progressStats.completedCount / levels.length) * 100);
 
   const stats = [
     {
@@ -115,8 +115,8 @@ export default function ProgressDashboard({
             <span className="text-sm font-bold text-purple-600">{overallProgress}%</span>
           </div>
           <AnimatedProgressBar
-            progress={currentScore}
-            total={totalPossiblePoints}
+            progress={progressStats.completedCount}
+            total={levels.length}
             color="purple"
             size="large"
           />

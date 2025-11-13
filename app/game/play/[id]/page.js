@@ -17,7 +17,8 @@ import {
 } from '@heroicons/react/24/solid';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../../../context/AuthContext';
-import FeedbackButton from '../../../../components/FeedbackButton';
+import { useChatbot } from '../../../../context/ChatbotContext';
+
 import HintSystem from '../../../../components/HintSystem';
 import AchievementNotification from '../../../../components/AchievementNotification';
 import { QuestionGenerationLoader, LevelLoadingSpinner } from '../../../../components/LoadingSpinner';
@@ -35,6 +36,7 @@ import {
 import { db } from '../../../../lib/firebase';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import React from 'react';
+import { extractQuestionContext, throttle } from '../../../../utils/chatbotContext';
 
 // Save level progress to Firebase
 const saveLevelProgress = async (userId, levelId, score, passed) => {
@@ -385,6 +387,35 @@ export default function GameplayPage({ params }) {
       setQuestionStartTime(Date.now());
     }
   }, [currentQuestionIndex, currentQuestion, showExplanation]);
+
+  // Update chatbot context when question changes (throttled)
+  useEffect(() => {
+    if (!loading && !generatingQuestions && currentQuestion && level) {
+      const updateContext = throttle(() => {
+        const context = extractQuestionContext(
+          level,
+          currentQuestion,
+          currentQuestionIndex,
+          questions.length,
+          score,
+          lives,
+          userProfile
+        );
+      }, 1000); // Throttle to max 1 update per second
+
+      updateContext();
+    }
+  }, [
+    currentQuestion,
+    currentQuestionIndex,
+    level,
+    questions.length,
+    score,
+    lives,
+    userProfile,
+    loading,
+    generatingQuestions,
+  ]);
 
   // Timer effect
   useEffect(() => {
@@ -927,8 +958,7 @@ export default function GameplayPage({ params }) {
         </div>
       </div>
 
-      {/* Feedback Button */}
-      <FeedbackButton />
+
     </div>
   );
 }
