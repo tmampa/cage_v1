@@ -175,7 +175,7 @@ export default function LevelsPage() {
         const unlockedCount = updatedLevels.filter((l) => l.unlocked).length;
         const completedCount = updatedLevels.filter((l) => l.completed).length;
         const progressPercentage = Math.round(
-          (completedCount / levels.length) * 100
+          (completedCount / updatedLevels.length) * 100
         );
 
         setProgressStats({
