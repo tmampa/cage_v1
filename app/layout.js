@@ -1,5 +1,6 @@
 import './globals.css';
 import { AuthProvider } from '../context/AuthContext';
+import { ChatbotProvider } from '../context/ChatbotContext';
 
 export const metadata = {
   title: 'CagE - Cybersecurity Game',
@@ -11,7 +12,9 @@ export default function RootLayout({ children }) {
   return (
     <html lang='en'>
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <ChatbotProvider>{children}</ChatbotProvider>
+        </AuthProvider>
       </body>
     </html>
   );
