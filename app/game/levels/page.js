@@ -35,7 +35,6 @@ import { extractLevelsContext, throttle } from '../../../utils/chatbotContext';
 
 export default function LevelsPage() {
   const { user, userProfile } = useAuth();
-  const { updateGameContext } = useChatbot();
 
   // State for levels and user progress
   const [levels, setLevels] = useState([
@@ -243,16 +242,6 @@ export default function LevelsPage() {
   };
 
   const filteredLevels = getFilteredLevels();
-
-  // Update chatbot context when page loads or data changes (throttled)
-  useEffect(() => {
-    const updateContext = throttle(() => {
-      const context = extractLevelsContext(levels, progressStats, userProfile, viewMode);
-      updateGameContext(context);
-    }, 1000); // Throttle to max 1 update per second
-
-    updateContext();
-  }, [levels, progressStats, userProfile, viewMode, updateGameContext]);
 
   // Animation variants
   const containerVariants = {

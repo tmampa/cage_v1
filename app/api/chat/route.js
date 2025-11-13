@@ -1,7 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextResponse } from 'next/server';
 import { checkRateLimit, RATE_LIMIT_CONFIG } from '@/utils/rateLimiter';
-import { constructSystemPrompt, formatConversationHistory } from '@/utils/chatbotPrompts';
 
 // Initialize Gemini AI - using the same approach as generateQuestions.js
 const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY);
@@ -24,14 +23,6 @@ function validateRequest(body) {
   
   if (body.conversationHistory && !Array.isArray(body.conversationHistory)) {
     errors.push('Conversation history must be an array');
-  }
-  
-  if (body.gameContext && typeof body.gameContext !== 'object') {
-    errors.push('Game context must be an object');
-  }
-  
-  if (body.action && !['chat', 'hint', 'explain'].includes(body.action)) {
-    errors.push('Action must be one of: chat, hint, explain');
   }
   
   return {
@@ -109,8 +100,17 @@ export async function POST(request) {
       },
     });
     
-    // Construct system prompt
-    const systemPrompt = constructSystemPrompt(body.gameContext, body.action);
+    // Simple system prompt without game context
+    const systemPrompt = `You are a friendly AI tutor helping students learn cybersecurity through the CagE game.
+Your role is to answer questions about cybersecurity concepts and provide educational guidance.
+
+Guidelines:
+- Be encouraging and supportive
+- Use simple language appropriate for students
+- Provide clear explanations with examples
+- Use emojis occasionally to be friendly (🔒, 🛡️, 💡, etc.)
+- Keep responses under 300 words
+- Focus on cybersecurity education`;
     
     // Format conversation history as a single prompt
     let fullPrompt = systemPrompt + '\n\n';
@@ -140,7 +140,7 @@ export async function POST(request) {
     const text = response.text();
     
     // Log successful request (for monitoring)
-    console.log(`[Chat API] Success - IP: ${ip}, Action: ${body.action || 'chat'}, Response length: ${text.length}`);
+    console.log(`[Chat API] Success - IP: ${ip}, Response length: ${text.length}`);
     
     return NextResponse.json({ message: text });
     

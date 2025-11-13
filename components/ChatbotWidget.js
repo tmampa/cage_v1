@@ -7,8 +7,6 @@ import {
   ChatBubbleLeftRightIcon,
   XMarkIcon,
   PaperAirplaneIcon,
-  LightBulbIcon,
-  BookOpenIcon,
   TrashIcon
 } from '@heroicons/react/24/solid';
 import { useChatbot } from '../context/ChatbotContext';
@@ -21,12 +19,17 @@ export default function ChatbotWidget() {
     position,
     unreadCount,
     sendMessage,
-    getHint,
-    explainConcept,
     clearChat,
     toggleChatbot,
     updatePosition,
   } = useChatbot();
+
+  // Sample questions for quick actions
+  const sampleQuestions = [
+    "What is phishing?",
+    "How to create strong passwords?",
+    "What is two-factor authentication?",
+  ];
 
   const [inputValue, setInputValue] = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -215,21 +218,17 @@ export default function ChatbotWidget() {
           )}
         </div>
 
-        {/* Quick actions */}
+        {/* Sample questions */}
         <div className="px-4 py-2 bg-white border-t border-gray-200">
           <div className="flex gap-2 overflow-x-auto pb-2">
-            <QuickActionButton
-              icon={LightBulbIcon}
-              label="Get Hint"
-              onClick={getHint}
-              disabled={isLoading}
-            />
-            <QuickActionButton
-              icon={BookOpenIcon}
-              label="Explain"
-              onClick={explainConcept}
-              disabled={isLoading}
-            />
+            {sampleQuestions.map((question, index) => (
+              <SampleQuestionButton
+                key={index}
+                label={question}
+                onClick={() => sendMessage(question)}
+                disabled={isLoading}
+              />
+            ))}
             <QuickActionButton
               icon={TrashIcon}
               label="Clear"
@@ -319,21 +318,17 @@ export default function ChatbotWidget() {
           )}
         </div>
 
-        {/* Quick actions */}
+        {/* Sample questions */}
         <div className="px-4 py-2 bg-white border-t border-gray-200">
-          <div className="flex gap-2">
-            <QuickActionButton
-              icon={LightBulbIcon}
-              label="Hint"
-              onClick={getHint}
-              disabled={isLoading}
-            />
-            <QuickActionButton
-              icon={BookOpenIcon}
-              label="Explain"
-              onClick={explainConcept}
-              disabled={isLoading}
-            />
+          <div className="flex gap-2 overflow-x-auto">
+            {sampleQuestions.map((question, index) => (
+              <SampleQuestionButton
+                key={index}
+                label={question}
+                onClick={() => sendMessage(question)}
+                disabled={isLoading}
+              />
+            ))}
             <QuickActionButton
               icon={TrashIcon}
               label="Clear"
@@ -367,6 +362,19 @@ export default function ChatbotWidget() {
         </form>
       </motion.div>
     </>
+  );
+}
+
+// Sample question button component
+function SampleQuestionButton({ label, onClick, disabled }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-full text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+    >
+      {label}
+    </button>
   );
 }
 

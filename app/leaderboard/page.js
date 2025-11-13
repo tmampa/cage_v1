@@ -24,7 +24,6 @@ import { extractLeaderboardContext } from '../../utils/chatbotContext';
 
 export default function LeaderboardPage() {
   const { user, userProfile } = useAuth();
-  const { updateGameContext } = useChatbot();
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -35,14 +34,6 @@ export default function LeaderboardPage() {
   useEffect(() => {
     fetchLeaderboardData();
   }, [timeFilter, user?.id]);
-
-  // Update chatbot context when leaderboard data changes
-  useEffect(() => {
-    if (userProfile && leaderboardData.length > 0) {
-      const context = extractLeaderboardContext(userProfile, userRank, leaderboardData.length);
-      updateGameContext(context);
-    }
-  }, [userProfile, userRank, leaderboardData, updateGameContext]);
 
   async function fetchLeaderboardData() {
     try {

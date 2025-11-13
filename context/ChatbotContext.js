@@ -26,16 +26,6 @@ export function ChatbotProvider({ children }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [position, setPosition] = useState({ x: 20, y: 20 });
-  const [gameContext, setGameContext] = useState({
-    currentPage: 'home',
-    levelId: null,
-    levelTitle: null,
-    levelDescription: null,
-    questionText: null,
-    questionNumber: null,
-    totalQuestions: null,
-    userProgress: null,
-  });
   const [unreadCount, setUnreadCount] = useState(0);
 
   // Load chat history and widget state from session storage on mount
@@ -113,7 +103,7 @@ export function ChatbotProvider({ children }) {
   }, []);
 
   // Send a message to the chatbot
-  const sendMessage = useCallback(async (text, action = 'chat') => {
+  const sendMessage = useCallback(async (text) => {
     if (!text.trim()) return;
 
     // Create user message
@@ -144,8 +134,6 @@ export function ChatbotProvider({ children }) {
         body: JSON.stringify({
           message: text.trim(),
           conversationHistory,
-          gameContext,
-          action,
         }),
       });
 
@@ -189,25 +177,7 @@ export function ChatbotProvider({ children }) {
     } finally {
       setIsLoading(false);
     }
-  }, [messages, gameContext, isOpen, trimMessageHistory]);
-
-  // Get a hint for the current question
-  const getHint = useCallback(async () => {
-    const hintRequest = gameContext.questionText
-      ? `Can you give me a hint for this question?`
-      : `Can you give me a hint?`;
-    
-    await sendMessage(hintRequest, 'hint');
-  }, [gameContext.questionText, sendMessage]);
-
-  // Get an explanation of the current concept
-  const explainConcept = useCallback(async () => {
-    const explainRequest = gameContext.levelTitle
-      ? `Can you explain the concept of ${gameContext.levelTitle}?`
-      : `Can you explain the current concept?`;
-    
-    await sendMessage(explainRequest, 'explain');
-  }, [gameContext.levelTitle, sendMessage]);
+  }, [messages, isOpen, trimMessageHistory]);
 
   // Clear chat history
   const clearChat = useCallback(() => {
@@ -218,14 +188,6 @@ export function ChatbotProvider({ children }) {
     } catch (error) {
       console.error('Error clearing chat history:', error);
     }
-  }, []);
-
-  // Update game context
-  const updateGameContext = useCallback((newContext) => {
-    setGameContext((prev) => ({
-      ...prev,
-      ...newContext,
-    }));
   }, []);
 
   // Toggle chatbot open/closed state
@@ -251,13 +213,9 @@ export function ChatbotProvider({ children }) {
     isOpen,
     isLoading,
     position,
-    gameContext,
     unreadCount,
     sendMessage,
-    getHint,
-    explainConcept,
     clearChat,
-    updateGameContext,
     toggleChatbot,
     updatePosition,
   };

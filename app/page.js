@@ -29,7 +29,6 @@ import { extractHomeContext } from "../utils/chatbotContext";
 
 export default function Home() {
   const { user, userProfile, signOut } = useAuth();
-  const { updateGameContext } = useChatbot();
   
   // Create decorative bubbles
   const [bubbles, setBubbles] = useState([]);
@@ -100,12 +99,6 @@ export default function Home() {
 
     loadUserProgress();
   }, [user?.id]);
-
-  // Update chatbot context when page loads or data changes
-  useEffect(() => {
-    const context = extractHomeContext(userProfile, levelProgress);
-    updateGameContext(context);
-  }, [userProfile, levelProgress, updateGameContext]);
 
   const handleSignOut = async () => {
     await signOut();

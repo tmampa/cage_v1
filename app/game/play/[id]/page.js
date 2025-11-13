@@ -139,7 +139,6 @@ const getLevelProgress = async (userId, levelId) => {
 export default function GameplayPage({ params }) {
   const router = useRouter();
   const { user, userProfile, updateProfile } = useAuth();
-  const { updateGameContext } = useChatbot();
 
   // Unwrap params using React.use()
   const unwrappedParams = React.use(params);
@@ -402,7 +401,6 @@ export default function GameplayPage({ params }) {
           lives,
           userProfile
         );
-        updateGameContext(context);
       }, 1000); // Throttle to max 1 update per second
 
       updateContext();
@@ -417,7 +415,6 @@ export default function GameplayPage({ params }) {
     userProfile,
     loading,
     generatingQuestions,
-    updateGameContext,
   ]);
 
   // Timer effect

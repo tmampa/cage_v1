@@ -61,7 +61,6 @@ const avatarEmojis = [
 
 function ProfilePage() {
   const { user, userProfile, updateProfile, logout } = useAuth();
-  const { updateGameContext } = useChatbot();
   const router = useRouter();
 
   const [isEditing, setIsEditing] = useState(false);
@@ -148,16 +147,6 @@ function ProfilePage() {
   }, [userProfile]);
 
   // Update chatbot context when profile data changes
-  useEffect(() => {
-    if (userProfile) {
-      const progressStats = {
-        completedLevels: userStats.levelsCompleted,
-      };
-      const context = extractProfileContext(userProfile, achievements, progressStats);
-      updateGameContext(context);
-    }
-  }, [userProfile, achievements, userStats, updateGameContext]);
-
   const handleSignOut = async () => {
     try {
       await logout();
