@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import { 
@@ -12,6 +13,12 @@ import {
 import { useChatbot } from '../context/ChatbotContext';
 
 export default function ChatbotWidget() {
+  const pathname = usePathname();
+  
+  // Hide chatbot on profile page
+  if (pathname === '/profile') {
+    return null;
+  }
   const {
     messages,
     isOpen,
