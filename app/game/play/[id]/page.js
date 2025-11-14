@@ -92,7 +92,7 @@ const saveLevelProgress = async (userId, levelId, score, passed) => {
       await updateDoc(userRef, {
         score: totalScore,
         highestLevel: passed
-          ? Math.max(currentHighestLevel, levelId)
+          ? Math.max(currentHighestLevel, levelId + 1)
           : currentHighestLevel,
         updatedAt: new Date().toISOString(),
       });
