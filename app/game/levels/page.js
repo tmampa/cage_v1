@@ -154,12 +154,24 @@ export default function LevelsPage() {
           userProgress.push(doc.data());
         });
 
+        // Find the highest completed level
+        const completedLevelIds = userProgress
+          .filter(p => p.passed)
+          .map(p => p.levelId);
+        const highestCompletedLevel = completedLevelIds.length > 0 
+          ? Math.max(...completedLevelIds) 
+          : 0;
+
         // Update levels with unlocked and completed status
         const updatedLevels = levels.map((level) => {
-          const isUnlocked = level.id <= highestLevel; // Only unlock up to highest level
           const progress = userProgress.find((p) => p.levelId === level.id);
           const isCompleted = progress?.passed || false;
           const levelScore = progress?.score || 0;
+          
+          // Unlock level 1 by default, or if it's completed, or if previous level is completed
+          const isUnlocked = level.id === 1 || 
+                            level.id <= highestLevel || 
+                            level.id <= highestCompletedLevel + 1;
 
           return {
             ...level,
