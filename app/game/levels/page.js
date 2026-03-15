@@ -33,6 +33,7 @@ import {
 import { getFirebaseUserStats, getFirebaseAchievements } from '../../../lib/firebase';
 import { getAchievementProgress } from '../../../utils/achievements';
 import { extractLevelsContext, throttle } from '../../../utils/chatbotContext';
+import BottomNav from '../../../components/BottomNav';
 
 export default function LevelsPage() {
   const { user, userProfile } = useAuth();
@@ -475,38 +476,7 @@ export default function LevelsPage() {
       </div>
 
       {/* Bottom Navigation */}
-      <div className='fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md shadow-lg z-30 border-t border-gray-200'>
-        <div className='flex justify-around items-center py-2'>
-          <Link href='/' className='flex-1'>
-            <div className='flex flex-col items-center py-2 text-gray-600 hover:text-blue-500 transition-colors'>
-              <HomeIcon className='w-5 h-5' />
-              <span className='text-xs mt-1'>Home</span>
-            </div>
-          </Link>
-
-          <Link href='/game/levels' className='flex-1'>
-            <div className='flex flex-col items-center py-2 text-blue-500 relative'>
-              <PuzzlePieceIcon className='w-5 h-5' />
-              <span className='text-xs mt-1 font-medium'>Levels</span>
-              <div className='absolute -top-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-blue-500 rounded-full'></div>
-            </div>
-          </Link>
-
-          <Link href='/leaderboard' className='flex-1'>
-            <div className='flex flex-col items-center py-2 text-gray-600 hover:text-blue-500 transition-colors'>
-              <TrophyIcon className='w-5 h-5' />
-              <span className='text-xs mt-1'>Leaderboard</span>
-            </div>
-          </Link>
-
-          <Link href='/profile' className='flex-1'>
-            <div className='flex flex-col items-center py-2 text-gray-600 hover:text-blue-500 transition-colors'>
-              <UserIcon className='w-5 h-5' />
-              <span className='text-xs mt-1'>Profile</span>
-            </div>
-          </Link>
-        </div>
-      </div>
+      <BottomNav activeTab="levels" />
 
 
     </div>

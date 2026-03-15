@@ -46,6 +46,7 @@ import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import React from 'react';
 import { extractQuestionContext, throttle } from '../../../../utils/chatbotContext';
 import { playCorrect, playWrong, playLevelComplete, playGameOver, playAchievement } from '../../../../utils/sounds';
+import BottomNav from '../../../../components/BottomNav';
 
 // Difficulty-based scoring and timer configuration
 const DIFFICULTY_CONFIG = {
@@ -694,37 +695,7 @@ export default function GameplayPage({ params }) {
         </div>
 
         {/* Bottom Tabs Navigation Bar */}
-        <div className='fixed bottom-0 left-0 right-0 bg-white shadow-lg z-30'>
-          <div className='flex justify-around items-center'>
-            <Link href='/game/levels' className='flex-1'>
-              <div className='flex flex-col items-center py-3 text-blue-600'>
-                <HomeIcon className='w-6 h-6' />
-                <span className='text-xs mt-1'>Home</span>
-              </div>
-            </Link>
-
-            <Link href='/game/levels' className='flex-1'>
-              <div className='flex flex-col items-center py-3 text-purple-600 border-t-2 border-purple-600'>
-                <PuzzlePieceIcon className='w-6 h-6' />
-                <span className='text-xs mt-1'>Levels</span>
-              </div>
-            </Link>
-
-            <Link href='/leaderboard' className='flex-1'>
-              <div className='flex flex-col items-center py-3 text-blue-600'>
-                <TrophyIcon className='w-6 h-6' />
-                <span className='text-xs mt-1'>Leaderboard</span>
-              </div>
-            </Link>
-
-            <Link href='/profile' className='flex-1'>
-              <div className='flex flex-col items-center py-3 text-blue-600'>
-                <UserIcon className='w-6 h-6' />
-                <span className='text-xs mt-1'>Profile</span>
-              </div>
-            </Link>
-          </div>
-        </div>
+        <BottomNav activeTab="levels" />
       </div>
     );
   }
@@ -880,37 +851,7 @@ export default function GameplayPage({ params }) {
         </div>
 
         {/* Bottom Tabs Navigation Bar */}
-        <div className='fixed bottom-0 left-0 right-0 bg-white shadow-lg z-30'>
-          <div className='flex justify-around items-center'>
-            <Link href='/' className='flex-1'>
-              <div className='flex flex-col items-center py-3 text-blue-600'>
-                <HomeIcon className='w-6 h-6' />
-                <span className='text-xs mt-1'>Home</span>
-              </div>
-            </Link>
-
-            <Link href='/game/levels' className='flex-1'>
-              <div className='flex flex-col items-center py-3 text-purple-600 border-t-2 border-purple-600'>
-                <PuzzlePieceIcon className='w-6 h-6' />
-                <span className='text-xs mt-1'>Levels</span>
-              </div>
-            </Link>
-
-            <Link href='/leaderboard' className='flex-1'>
-              <div className='flex flex-col items-center py-3 text-blue-600'>
-                <TrophyIcon className='w-6 h-6' />
-                <span className='text-xs mt-1'>Leaderboard</span>
-              </div>
-            </Link>
-
-            <Link href='/profile' className='flex-1'>
-              <div className='flex flex-col items-center py-3 text-blue-600'>
-                <UserIcon className='w-6 h-6' />
-                <span className='text-xs mt-1'>Profile</span>
-              </div>
-            </Link>
-          </div>
-        </div>
+        <BottomNav activeTab="levels" />
       </div>
     );
   }
@@ -1006,37 +947,7 @@ export default function GameplayPage({ params }) {
       </div>
 
       {/* Bottom Tabs Navigation Bar */}
-      <div className='fixed bottom-0 left-0 right-0 bg-white shadow-lg z-30'>
-        <div className='flex justify-around items-center'>
-          <Link href='/' className='flex-1'>
-            <div className='flex flex-col items-center py-3 text-blue-600'>
-              <HomeIcon className='w-6 h-6' />
-              <span className='text-xs mt-1'>Home</span>
-            </div>
-          </Link>
-
-          <Link href='/game/levels' className='flex-1'>
-            <div className='flex flex-col items-center py-3 text-purple-600 border-t-2 border-purple-600'>
-              <PuzzlePieceIcon className='w-6 h-6' />
-              <span className='text-xs mt-1'>Levels</span>
-            </div>
-          </Link>
-
-          <Link href='/leaderboard' className='flex-1'>
-            <div className='flex flex-col items-center py-3 text-blue-600'>
-              <TrophyIcon className='w-6 h-6' />
-              <span className='text-xs mt-1'>Leaderboard</span>
-            </div>
-          </Link>
-
-          <Link href='/profile' className='flex-1'>
-            <div className='flex flex-col items-center py-3 text-blue-600'>
-              <UserIcon className='w-6 h-6' />
-              <span className='text-xs mt-1'>Profile</span>
-            </div>
-          </Link>
-        </div>
-      </div>
+      <BottomNav activeTab="levels" />
 
 
     </div>
