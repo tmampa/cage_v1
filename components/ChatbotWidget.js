@@ -40,11 +40,6 @@ export default function ChatbotWidget() {
   const widgetRef = useRef(null);
   const messagesEndRef = useRef(null);
 
-  // Hide chatbot on profile page (after all hooks)
-  if (pathname === '/profile') {
-    return null;
-  }
-
   // Auto-scroll to bottom when new messages arrive or loading state changes
   useEffect(() => {
     if (messagesEndRef.current && isOpen) {
@@ -128,6 +123,11 @@ export default function ChatbotWidget() {
       };
     }
   }, [isDragging, dragOffset, currentPosition]);
+
+  // Hide chatbot on profile page (must be after all hooks)
+  if (pathname === '/profile') {
+    return null;
+  }
 
   // Handle sending a message
   const handleSendMessage = async (e) => {
