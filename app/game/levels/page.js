@@ -30,6 +30,7 @@ import {
   doc,
   getDoc,
 } from 'firebase/firestore';
+import { getFirebaseUserStats, getFirebaseAchievements } from '../../../lib/firebase';
 import { getAchievementProgress } from '../../../utils/achievements';
 import { extractLevelsContext, throttle } from '../../../utils/chatbotContext';
 
@@ -123,6 +124,9 @@ export default function LevelsPage() {
   // Recent achievements state
   const [recentAchievements, setRecentAchievements] = useState([]);
 
+  // Real user stats from Firestore
+  const [userStats, setUserStats] = useState(null);
+
   // New state for enhanced UI
   const [viewMode, setViewMode] = useState('map'); // 'map', 'grid'
   const [filters, setFilters] = useState({
@@ -144,9 +148,9 @@ export default function LevelsPage() {
           ? userDoc.data().highestLevel || 1
           : 1;
 
-        // Get all progress documents for this user
-        const progressRef = collection(db, 'progress');
-        const q = query(progressRef, where('userId', '==', user.id));
+        // Get all progress documents for this user from level_progress collection
+        const progressRef = collection(db, 'level_progress');
+        const q = query(progressRef, where('user_id', '==', user.id));
         const querySnapshot = await getDocs(q);
 
         const userProgress = [];
@@ -156,16 +160,16 @@ export default function LevelsPage() {
 
         // Find the highest completed level
         const completedLevelIds = userProgress
-          .filter(p => p.passed)
-          .map(p => p.levelId);
+          .filter(p => p.completed)
+          .map(p => p.level_id);
         const highestCompletedLevel = completedLevelIds.length > 0 
           ? Math.max(...completedLevelIds) 
           : 0;
 
         // Update levels with unlocked and completed status
         const updatedLevels = levels.map((level) => {
-          const progress = userProgress.find((p) => p.levelId === level.id);
-          const isCompleted = progress?.passed || false;
+          const progress = userProgress.find((p) => p.level_id === level.id);
+          const isCompleted = progress?.completed || false;
           const levelScore = progress?.score || 0;
           
           // Unlock level 1 by default, or if it's completed, or if previous level is completed
@@ -197,16 +201,34 @@ export default function LevelsPage() {
           completedLevels: updatedLevels.filter(l => l.completed).map(l => l.id),
         });
 
-        // Load recent achievements from localStorage
-        const storedAchievements = localStorage.getItem(`achievements_${user.id}`);
-        if (storedAchievements) {
-          const achievements = JSON.parse(storedAchievements);
-          // Sort by earnedAt date and take the 5 most recent
-          const recent = achievements
-            .filter(a => a.earnedAt)
-            .sort((a, b) => new Date(b.earnedAt) - new Date(a.earnedAt))
-            .slice(0, 5);
-          setRecentAchievements(recent);
+        // Load real user stats from Firestore
+        try {
+          const stats = await getFirebaseUserStats(user.id);
+          if (stats) {
+            setUserStats(stats);
+          }
+        } catch (statsError) {
+          console.error('Error loading user stats:', statsError);
+        }
+
+        // Load recent achievements from Firestore (fall back to localStorage)
+        try {
+          let achievements = await getFirebaseAchievements(user.id);
+          if (!achievements || achievements.length === 0) {
+            const storedAchievements = localStorage.getItem(`achievements_${user.id}`);
+            if (storedAchievements) {
+              achievements = JSON.parse(storedAchievements);
+            }
+          }
+          if (achievements && achievements.length > 0) {
+            const recent = achievements
+              .filter(a => a.earnedAt)
+              .sort((a, b) => new Date(b.earnedAt) - new Date(a.earnedAt))
+              .slice(0, 5);
+            setRecentAchievements(recent);
+          }
+        } catch (achError) {
+          console.error('Error loading achievements:', achError);
         }
       } catch (error) {
         console.error('Error loading user progress:', error);
@@ -361,6 +383,7 @@ export default function LevelsPage() {
           progressStats={progressStats}
           levels={levels}
           recentAchievements={recentAchievements}
+          userStats={userStats}
         />
 
         {/* Level Filters (only show in grid mode) */}

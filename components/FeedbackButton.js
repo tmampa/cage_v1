@@ -12,6 +12,13 @@ import { useAuth } from '../context/AuthContext';
 import emailjs from '@emailjs/browser';
 import { db } from '../lib/firebase';
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import { 
+  getFirebaseUserStats, 
+  saveFirebaseUserStats, 
+  getFirebaseAchievements, 
+  saveFirebaseAchievements 
+} from '../lib/firebase';
+import { checkAchievements, DEFAULT_USER_STATS } from '../utils/achievements';
 
 export default function FeedbackButton() {
   const { user, userProfile } = useAuth();
@@ -109,6 +116,24 @@ export default function FeedbackButton() {
 
       setSubmitStatus('success');
       
+      // Update feedbackSubmitted stat for Feedback Hero achievement
+      if (user?.id) {
+        try {
+          const currentStats = await getFirebaseUserStats(user.id) || { ...DEFAULT_USER_STATS };
+          const updatedStats = { ...DEFAULT_USER_STATS, ...currentStats, feedbackSubmitted: (currentStats.feedbackSubmitted || 0) + 1 };
+          await saveFirebaseUserStats(user.id, updatedStats);
+          
+          // Check for Feedback Hero achievement
+          const currentAch = await getFirebaseAchievements(user.id) || [];
+          const newAch = checkAchievements(updatedStats, currentAch);
+          if (newAch.length > 0) {
+            await saveFirebaseAchievements(user.id, [...currentAch, ...newAch]);
+          }
+        } catch (achError) {
+          console.error('Error updating feedback achievement:', achError);
+        }
+      }
+
       // Reset form after 2 seconds
       setTimeout(() => {
         setFeedback('');

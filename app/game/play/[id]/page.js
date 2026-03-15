@@ -34,107 +34,28 @@ import {
   DEFAULT_USER_STATS 
 } from '../../../../utils/achievements';
 import { db } from '../../../../lib/firebase';
+import { 
+  saveFirebaseUserStats, 
+  getFirebaseUserStats, 
+  saveFirebaseAchievements, 
+  getFirebaseAchievements,
+  saveFirebaseLevelProgress,
+  getFirebaseLevelProgress,
+} from '../../../../lib/firebase';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import React from 'react';
 import { extractQuestionContext, throttle } from '../../../../utils/chatbotContext';
 
-// Save level progress to Firebase
-const saveLevelProgress = async (userId, levelId, score, passed) => {
-  try {
-    const progressRef = doc(db, 'progress', `${userId}_${levelId}`);
-    const progressData = {
-      userId,
-      levelId,
-      score,
-      passed,
-      completedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    // Check if document exists
-    const docSnap = await getDoc(progressRef);
-    const isNewHighScore =
-      !docSnap.exists() || (docSnap.exists() && docSnap.data().score < score);
-
-    if (docSnap.exists()) {
-      // Only update if new score is higher
-      if (isNewHighScore) {
-        await updateDoc(progressRef, progressData);
-      }
-    } else {
-      // Create new document
-      await setDoc(progressRef, {
-        ...progressData,
-        createdAt: new Date().toISOString(),
-      });
-    }
-
-    // Update user's total score and highest level in their profile
-    const userRef = doc(db, 'users', userId);
-    const userDoc = await getDoc(userRef);
-
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-      let totalScore = userData.score || 0;
-      const currentHighestLevel = userData.highestLevel || 0;
-
-      // If this is a new high score for the level, update the total score
-      if (isNewHighScore) {
-        // If there was a previous score for this level, subtract it
-        if (docSnap.exists()) {
-          totalScore -= docSnap.data().score;
-        }
-        // Add the new score
-        totalScore += score;
-      }
-
-      // Update user profile with new total score and highest level if applicable
-      await updateDoc(userRef, {
-        score: totalScore,
-        highestLevel: passed
-          ? Math.max(currentHighestLevel, levelId + 1)
-          : currentHighestLevel,
-        updatedAt: new Date().toISOString(),
-      });
-
-      // Update leaderboard
-      const leaderboardRef = doc(db, 'leaderboard', userId);
-      await setDoc(
-        leaderboardRef,
-        {
-          userId,
-          username: userData.username,
-          score: totalScore,
-          avatar_emoji: userData.avatar_emoji || '👤',
-          updatedAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Error saving progress:', error);
-    throw error;
-  }
+// Difficulty-based scoring and timer configuration
+const DIFFICULTY_CONFIG = {
+  Easy:   { basePoints: 100, timeBonus: 20, timer: 60 },
+  Medium: { basePoints: 150, timeBonus: 30, timer: 45 },
+  Hard:   { basePoints: 200, timeBonus: 40, timer: 30 },
 };
 
-// Get level progress from Firebase
-const getLevelProgress = async (userId, levelId) => {
-  try {
-    const progressRef = doc(db, 'progress', `${userId}_${levelId}`);
-    const docSnap = await getDoc(progressRef);
-
-    if (docSnap.exists()) {
-      return docSnap.data();
-    }
-
-    return null;
-  } catch (error) {
-    console.error('Error getting progress:', error);
-    throw error;
-  }
-};
+function getDifficultyConfig(difficulty) {
+  return DIFFICULTY_CONFIG[difficulty] || DIFFICULTY_CONFIG.Easy;
+}
 
 export default function GameplayPage({ params }) {
   const router = useRouter();
@@ -170,6 +91,8 @@ export default function GameplayPage({ params }) {
   const [levelComplete, setLevelComplete] = useState(false);
   const [isAnswerCorrect, setIsAnswerCorrect] = useState(null);
   const [generatingQuestions, setGeneratingQuestions] = useState(true);
+  const [answeredQuestions, setAnsweredQuestions] = useState([]); // Track answers for review
+  const [showReview, setShowReview] = useState(false); // Post-level review toggle
 
   // Ref for the timer
   const timerRef = React.useRef(null);
@@ -224,7 +147,7 @@ export default function GameplayPage({ params }) {
         // Check for existing progress
         let userProgress = null;
         if (user?.id) {
-          userProgress = await getLevelProgress(user.id, levelId);
+          userProgress = await getFirebaseLevelProgress(user.id, levelId);
         }
 
         // Generate new questions or load existing ones
@@ -252,7 +175,11 @@ export default function GameplayPage({ params }) {
         setGeneratingQuestions(false);
         setShowExplanation(false);
         setSelectedAnswer(null);
-        setTimeLeft(60);
+        setAnsweredQuestions([]);
+        setShowReview(false);
+        // Set timer based on level difficulty
+        const diffConfig = getDifficultyConfig(currentLevel.difficulty);
+        setTimeLeft(diffConfig.timer);
         setGameOver(false);
         setLevelComplete(false);
         
@@ -263,33 +190,41 @@ export default function GameplayPage({ params }) {
         setFastestAnswer(Infinity);
         setQuestionStartTime(Date.now());
 
-        // Initialize user stats based on actual progress
-        if (user?.id && userProfile) {
-          const currentScore = userProfile.score || 0;
-          const estimatedLevelsCompleted = Math.floor(currentScore / 100); // Rough estimate
-          const estimatedCorrectAnswers = estimatedLevelsCompleted * 5; // Estimate 5 questions per level
-          
-          const initialStats = {
-            ...DEFAULT_USER_STATS,
-            levelsCompleted: estimatedLevelsCompleted,
-            correctAnswers: estimatedCorrectAnswers,
-            totalAnswers: estimatedCorrectAnswers + Math.floor(estimatedCorrectAnswers * 0.2), // Add some wrong answers
-            perfectScores: Math.floor(estimatedLevelsCompleted * 0.3), // Estimate some perfect scores
-          };
-          
-          setUserStats(initialStats);
-          console.log('Initialized user stats:', initialStats);
-
-          // Load existing achievements from localStorage
+        // Load real user stats from Firestore
+        if (user?.id) {
           try {
-            const savedAchievements = localStorage.getItem(`achievements_${user.id}`);
-            if (savedAchievements) {
-              const achievements = JSON.parse(savedAchievements);
-              setUserAchievements(achievements);
-              console.log('Loaded existing achievements:', achievements);
+            const savedStats = await getFirebaseUserStats(user.id);
+            if (savedStats) {
+              const { userId: _uid, createdAt: _c, updatedAt: _u, ...statsData } = savedStats;
+              setUserStats({ ...DEFAULT_USER_STATS, ...statsData });
+              console.log('Loaded user stats from Firestore:', statsData);
+            } else {
+              setUserStats({ ...DEFAULT_USER_STATS });
             }
-          } catch (storageError) {
-            console.warn('Could not load achievements from localStorage:', storageError);
+          } catch (statsError) {
+            console.warn('Could not load user stats from Firestore:', statsError);
+            setUserStats({ ...DEFAULT_USER_STATS });
+          }
+
+          // Load existing achievements from Firestore (fall back to localStorage)
+          try {
+            const firestoreAchievements = await getFirebaseAchievements(user.id);
+            if (firestoreAchievements && firestoreAchievements.length > 0) {
+              setUserAchievements(firestoreAchievements);
+              console.log('Loaded achievements from Firestore:', firestoreAchievements);
+            } else {
+              // Migrate from localStorage if exists
+              const savedAchievements = localStorage.getItem(`achievements_${user.id}`);
+              if (savedAchievements) {
+                const achievements = JSON.parse(savedAchievements);
+                setUserAchievements(achievements);
+                // Migrate to Firestore
+                await saveFirebaseAchievements(user.id, achievements);
+                console.log('Migrated achievements from localStorage to Firestore');
+              }
+            }
+          } catch (achError) {
+            console.warn('Could not load achievements:', achError);
           }
         }
       } catch (error) {
@@ -314,11 +249,22 @@ export default function GameplayPage({ params }) {
     clearTimeout(timerRef.current);
 
     // Calculate results
-    const correctAnswers = Math.floor(score / 100);
     const totalQuestions = questions.length;
+    const correctAnswers = answeredQuestions.filter(q => q.isCorrect).length;
     const passThreshold = Math.floor(totalQuestions * 0.6); // 60% correct to pass
     const passed = correctAnswers >= passThreshold;
     const isPerfectScore = correctAnswers === totalQuestions;
+
+    // Check if this level was previously failed (for comeback achievement)
+    let isComeback = false;
+    if (passed && user?.id) {
+      try {
+        const prevProgress = await getFirebaseLevelProgress(user.id, levelId);
+        if (prevProgress && !prevProgress.completed) {
+          isComeback = true;
+        }
+      } catch {}
+    }
 
     setLevelComplete(true);
 
@@ -327,11 +273,22 @@ export default function GameplayPage({ params }) {
       ...userStats,
       levelsCompleted: passed ? userStats.levelsCompleted + 1 : userStats.levelsCompleted,
       perfectScores: isPerfectScore ? userStats.perfectScores + 1 : userStats.perfectScores,
-      noHintLevels: hintsRemaining === 3 && passed ? userStats.noHintLevels + 1 : userStats.noHintLevels
+      noHintLevels: hintsRemaining === 3 && passed ? userStats.noHintLevels + 1 : userStats.noHintLevels,
+      comebacks: isComeback ? (userStats.comebacks || 0) + 1 : (userStats.comebacks || 0),
     };
 
     // Update the user stats state
     setUserStats(finalStats);
+
+    // Persist stats to Firestore
+    if (user?.id) {
+      try {
+        await saveFirebaseUserStats(user.id, finalStats);
+        console.log('Saved user stats to Firestore');
+      } catch (statsError) {
+        console.error('Error saving user stats to Firestore:', statsError);
+      }
+    }
 
     // Check for new achievements
     try {
@@ -343,15 +300,18 @@ export default function GameplayPage({ params }) {
         // Show the first new achievement
         setNewAchievement(newAchievements[0]);
         // Add to user achievements
-        setUserAchievements(prev => [...prev, ...newAchievements]);
+        const allAchievements = [...userAchievements, ...newAchievements];
+        setUserAchievements(allAchievements);
         console.log('New achievements earned:', newAchievements);
         
-        // Save achievements to localStorage for persistence
-        try {
-          const savedAchievements = [...userAchievements, ...newAchievements];
-          localStorage.setItem(`achievements_${user?.id}`, JSON.stringify(savedAchievements));
-        } catch (storageError) {
-          console.warn('Could not save achievements to localStorage:', storageError);
+        // Save achievements to Firestore
+        if (user?.id) {
+          try {
+            await saveFirebaseAchievements(user.id, allAchievements);
+            console.log('Saved achievements to Firestore');
+          } catch (achError) {
+            console.error('Error saving achievements to Firestore:', achError);
+          }
         }
       } else {
         console.log('No new achievements earned this time');
@@ -363,7 +323,7 @@ export default function GameplayPage({ params }) {
     // Save progress to Firebase
     if (user?.id) {
       try {
-        await saveLevelProgress(user.id, levelId, score, passed);
+        await saveFirebaseLevelProgress(user.id, levelId, score, passed);
 
         // If this level was completed successfully, clear the last played level
         // so the continue button moves to the next level
@@ -489,9 +449,25 @@ export default function GameplayPage({ params }) {
     const isCorrect = answerIndex === correctAnswerIndex;
     setIsAnswerCorrect(isCorrect);
 
+    // Get difficulty-based scoring config
+    const diffConfig = getDifficultyConfig(level?.difficulty);
+
+    // Track this answer for post-level review
+    setAnsweredQuestions(prev => [...prev, {
+      question: currentQuestion.question,
+      options: currentQuestion.options,
+      selectedIndex: answerIndex,
+      correctIndex: correctAnswerIndex,
+      isCorrect,
+      explanation: currentQuestion.explanation,
+      hint: currentQuestion.hint,
+    }]);
+
     if (isCorrect) {
-      // Correct answer
-      setScore(prevScore => prevScore + 100);
+      // Calculate points: base + time bonus for fast answers
+      const timeBonus = timeLeft > (diffConfig.timer * 0.5) ? diffConfig.timeBonus : 0;
+      const pointsEarned = diffConfig.basePoints + timeBonus;
+      setScore(prevScore => prevScore + pointsEarned);
       
       // Update streak
       setCurrentStreak(prev => {
@@ -518,9 +494,16 @@ export default function GameplayPage({ params }) {
         try {
           const newAchievements = checkAchievements(newStats, userAchievements);
           if (newAchievements.length > 0) {
+            const allAch = [...userAchievements, ...newAchievements];
             setNewAchievement(newAchievements[0]);
-            setUserAchievements(prev => [...prev, ...newAchievements]);
+            setUserAchievements(allAch);
             console.log('🏆 Achievement earned during gameplay:', newAchievements[0]);
+            // Persist achievements to Firestore
+            if (user?.id) {
+              saveFirebaseAchievements(user.id, allAch).catch(e =>
+                console.error('Error persisting mid-game achievement:', e)
+              );
+            }
           }
         } catch (error) {
           console.error('Error checking achievements during gameplay:', error);
@@ -554,9 +537,15 @@ export default function GameplayPage({ params }) {
         try {
           const newAchievements = checkAchievements(newStats, userAchievements);
           if (newAchievements.length > 0) {
+            const allAch = [...userAchievements, ...newAchievements];
             setNewAchievement(newAchievements[0]);
-            setUserAchievements(prev => [...prev, ...newAchievements]);
+            setUserAchievements(allAch);
             console.log('🏆 Achievement earned during gameplay:', newAchievements[0]);
+            if (user?.id) {
+              saveFirebaseAchievements(user.id, allAch).catch(e =>
+                console.error('Error persisting mid-game achievement:', e)
+              );
+            }
           }
         } catch (error) {
           console.error('Error checking achievements during gameplay:', error);
@@ -575,7 +564,8 @@ export default function GameplayPage({ params }) {
       setCurrentQuestionIndex((prevIndex) => prevIndex + 1);
       setSelectedAnswer(null);
       setShowExplanation(false);
-      setTimeLeft(60);
+      const diffConfig = getDifficultyConfig(level?.difficulty);
+      setTimeLeft(diffConfig.timer);
       setIsAnswerCorrect(null);
       
       // Reset question timing for next question
@@ -736,9 +726,18 @@ export default function GameplayPage({ params }) {
   // Level complete screen
   if (levelComplete) {
     const totalQuestions = questions.length;
-    const correctAnswers = Math.floor(score / 100);
+    const correctAnswers = answeredQuestions.filter(q => q.isCorrect).length;
     const passThreshold = Math.floor(totalQuestions * 0.6);
     const passed = correctAnswers >= passThreshold;
+    const accuracy = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
+    const isPerfect = correctAnswers === totalQuestions;
+
+    // Star rating: 1 star = passed, 2 stars = 80%+, 3 stars = perfect
+    const starCount = isPerfect ? 3 : accuracy >= 80 ? 2 : passed ? 1 : 0;
+
+    // Check if there's a next level
+    const allLevels = getLevelDefinitions();
+    const nextLevel = allLevels.find(l => l.id === levelId + 1);
 
     return (
       <div className='min-h-screen bg-gradient-to-b from-blue-300 to-purple-300 text-blue-900 pb-20 relative'>
@@ -749,52 +748,127 @@ export default function GameplayPage({ params }) {
             transition={{ duration: 0.5 }}
             className='game-card p-6 max-w-lg mx-auto text-center'
           >
-            <h2 className='text-2xl font-bold mb-4 text-purple-700'>
+            <h2 className='text-2xl font-bold mb-2 text-purple-700'>
               {passed ? 'Mission Complete! 🎉' : 'Mission Incomplete 😢'}
             </h2>
 
-            <div className='mb-6 bg-blue-50 rounded-lg p-4'>
-              <h3 className='font-bold text-blue-700 mb-3'>Level Results</h3>
-              <div className='flex justify-between mb-2'>
-                <span className='text-blue-600'>Score:</span>
-                <span className='font-bold text-purple-700'>
-                  {score} points
-                </span>
-              </div>
-              <div className='flex justify-between mb-2'>
-                <span className='text-blue-600'>Correct Answers:</span>
-                <span className='font-bold text-purple-700'>
-                  {correctAnswers} / {totalQuestions}
-                </span>
-              </div>
-              <div className='flex justify-between'>
-                <span className='text-blue-600'>Status:</span>
-                <span
-                  className={`font-bold ${
-                    passed ? 'text-green-600' : 'text-red-600'
-                  }`}
+            {/* Star Rating */}
+            <div className='flex justify-center gap-1 mb-4'>
+              {[1, 2, 3].map(star => (
+                <motion.div
+                  key={star}
+                  initial={{ scale: 0, rotate: -180 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ delay: 0.3 + star * 0.2, type: 'spring', stiffness: 200 }}
                 >
-                  {passed ? 'PASSED' : 'FAILED'}
-                </span>
+                  <StarIcon
+                    className={`w-10 h-10 ${star <= starCount ? 'text-yellow-400' : 'text-gray-300'}`}
+                  />
+                </motion.div>
+              ))}
+            </div>
+
+            <div className='mb-4 bg-blue-50 rounded-lg p-4'>
+              <h3 className='font-bold text-blue-700 mb-3'>Level Results</h3>
+              <div className='grid grid-cols-2 gap-3 text-sm'>
+                <div className='bg-white rounded-lg p-2'>
+                  <div className='text-blue-500'>Score</div>
+                  <div className='font-bold text-purple-700 text-lg'>{score}</div>
+                </div>
+                <div className='bg-white rounded-lg p-2'>
+                  <div className='text-blue-500'>Accuracy</div>
+                  <div className='font-bold text-purple-700 text-lg'>{accuracy}%</div>
+                </div>
+                <div className='bg-white rounded-lg p-2'>
+                  <div className='text-blue-500'>Correct</div>
+                  <div className='font-bold text-purple-700 text-lg'>{correctAnswers}/{totalQuestions}</div>
+                </div>
+                <div className='bg-white rounded-lg p-2'>
+                  <div className='text-blue-500'>Best Streak</div>
+                  <div className='font-bold text-purple-700 text-lg'>{maxStreak}🔥</div>
+                </div>
               </div>
             </div>
 
-            <p className='mb-6 text-blue-700'>
+            {/* Question Review Toggle */}
+            {answeredQuestions.length > 0 && (
+              <button
+                onClick={() => setShowReview(!showReview)}
+                className='mb-4 text-sm font-medium text-blue-600 hover:text-blue-800 underline'
+              >
+                {showReview ? 'Hide Question Review' : `Review All Questions (${answeredQuestions.length})`}
+              </button>
+            )}
+
+            {/* Expandable Question Review */}
+            <AnimatePresence>
+              {showReview && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className='mb-4 text-left space-y-3 max-h-80 overflow-y-auto'
+                >
+                  {answeredQuestions.map((aq, idx) => (
+                    <div
+                      key={idx}
+                      className={`p-3 rounded-lg border-2 text-sm ${
+                        aq.isCorrect
+                          ? 'bg-green-50 border-green-200'
+                          : 'bg-red-50 border-red-200'
+                      }`}
+                    >
+                      <div className='font-medium mb-1'>
+                        {aq.isCorrect ? '✅' : '❌'} Q{idx + 1}: {aq.question}
+                      </div>
+                      {!aq.isCorrect && (
+                        <div className='text-xs space-y-1'>
+                          <div className='text-red-600'>
+                            Your answer: {aq.options[aq.selectedIndex]}
+                          </div>
+                          <div className='text-green-600'>
+                            Correct: {aq.options[aq.correctIndex]}
+                          </div>
+                        </div>
+                      )}
+                      {aq.explanation && (
+                        <div className='text-xs text-gray-600 mt-1 italic'>
+                          {aq.explanation}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <p className='mb-4 text-blue-700 text-sm'>
               {passed
-                ? "Great job protecting yourself online! You've earned cyber security points!"
+                ? isPerfect
+                  ? "Perfect score! You're a cybersecurity expert! 🏆"
+                  : "Great job protecting yourself online! You've earned cyber security points!"
                 : "Don't worry! Learning about cyber security takes practice. Try again!"}
             </p>
 
-            <div className='flex flex-col sm:flex-row gap-3 justify-center'>
-              <button
-                onClick={() => window.location.reload()}
-                className='btn-primary w-full'
-              >
-                Play Again
-              </button>
-              <Link href='/game/levels'>
-                <button className='btn-secondary w-full'>Back to Levels</button>
-              </Link>
+            <div className='flex flex-col gap-3'>
+              {passed && nextLevel && (
+                <Link href={`/game/play/${nextLevel.id}`}>
+                  <button className='btn-primary w-full text-lg py-3'>
+                    Next Level: {nextLevel.title} →
+                  </button>
+                </Link>
+              )}
+              <div className='flex gap-3'>
+                <button
+                  onClick={() => window.location.reload()}
+                  className={`${passed && nextLevel ? 'btn-secondary' : 'btn-primary'} flex-1`}
+                >
+                  Play Again
+                </button>
+                <Link href='/game/levels' className='flex-1'>
+                  <button className='btn-secondary w-full'>Back to Levels</button>
+                </Link>
+              </div>
             </div>
           </motion.div>
         </div>
@@ -917,7 +991,7 @@ export default function GameplayPage({ params }) {
               isCorrect={isAnswerCorrect}
               explanation={currentQuestion?.explanation}
               streak={currentStreak}
-              points={isAnswerCorrect ? 100 : 0}
+              points={isAnswerCorrect ? getDifficultyConfig(level?.difficulty).basePoints + (timeLeft > getDifficultyConfig(level?.difficulty).timer * 0.5 ? getDifficultyConfig(level?.difficulty).timeBonus : 0) : 0}
               isVisible={showExplanation}
               onNext={handleNextQuestion}
             />

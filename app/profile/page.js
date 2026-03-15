@@ -27,6 +27,7 @@ import EnhancedButton from '../../components/EnhancedButton';
 import { CircularProgress, AnimatedProgressBar } from '../../components/ProgressIndicators';
 import { AchievementsList } from '../../components/AchievementNotification';
 import { getAchievementProgress, DEFAULT_USER_STATS } from '../../utils/achievements';
+import { getFirebaseUserStats, getFirebaseAchievements } from '../../lib/firebase';
 import { db } from '../../lib/firebase';
 import {
   collection,
@@ -87,53 +88,54 @@ function ProfilePage() {
     if (!user?.id) return;
 
     try {
-      // Get actual progress from Firebase
-      const progressRef = collection(db, 'progress');
-      const q = query(progressRef, where('userId', '==', user.id));
-      const querySnapshot = await getDocs(q);
+      // Load real stats from Firestore
+      const savedStats = await getFirebaseUserStats(user.id);
+      
+      let calculatedStats;
+      if (savedStats) {
+        const { userId: _uid, createdAt: _c, updatedAt: _u, ...statsData } = savedStats;
+        calculatedStats = { ...DEFAULT_USER_STATS, ...statsData };
+      } else {
+        // Fallback: estimate from level_progress collection
+        const progressRef = collection(db, 'level_progress');
+        const q = query(progressRef, where('user_id', '==', user.id));
+        const querySnapshot = await getDocs(q);
 
-      let completedLevels = 0;
-      let totalCorrectAnswers = 0;
-      let totalAnswers = 0;
-      let perfectScores = 0;
+        let completedLevels = 0;
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.completed) {
+            completedLevels++;
+          }
+        });
 
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        if (data.passed) {
-          completedLevels++;
-        }
-        // Estimate questions based on score (each correct answer = 100 points)
-        const questionsCorrect = Math.floor((data.score || 0) / 100);
-        totalCorrectAnswers += questionsCorrect;
-        totalAnswers += questionsCorrect + 1; // Add some wrong answers
-        
-        // Perfect score if score equals max possible for level
-        if (data.score >= 500) { // Assuming 5 questions per level * 100 points
-          perfectScores++;
-        }
-      });
-
-      const calculatedStats = {
-        ...DEFAULT_USER_STATS,
-        levelsCompleted: completedLevels,
-        correctAnswers: totalCorrectAnswers,
-        totalAnswers: Math.max(totalAnswers, totalCorrectAnswers), // Ensure total >= correct
-        perfectScores: perfectScores,
-      };
+        calculatedStats = {
+          ...DEFAULT_USER_STATS,
+          levelsCompleted: completedLevels,
+        };
+      }
       
       console.log('Loaded actual user stats:', calculatedStats);
       setUserStats(calculatedStats);
       
+      // Load achievements from Firestore
+      const firestoreAchievements = await getFirebaseAchievements(user.id);
+      let earnedAchievements = firestoreAchievements || [];
+      
+      // Fallback to localStorage if no Firestore data
+      if (earnedAchievements.length === 0) {
+        const storedAchievements = localStorage.getItem(`achievements_${user.id}`);
+        if (storedAchievements) {
+          earnedAchievements = JSON.parse(storedAchievements);
+        }
+      }
+      
       // Get achievement progress
-      const achievementProgress = getAchievementProgress(calculatedStats, []);
+      const achievementProgress = getAchievementProgress(calculatedStats, earnedAchievements);
       setAchievements(achievementProgress);
     } catch (error) {
       console.error('Error loading user stats:', error);
-      // Fallback to basic stats
-      const basicStats = {
-        ...DEFAULT_USER_STATS,
-        levelsCompleted: 0,
-      };
+      const basicStats = { ...DEFAULT_USER_STATS };
       setUserStats(basicStats);
     }
   };
