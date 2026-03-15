@@ -1,6 +1,8 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
+import { db } from '../lib/firebase';
+import { collection, addDoc, doc, setDoc, Timestamp } from 'firebase/firestore';
 
 // Create the chatbot context
 const ChatbotContext = createContext({});
@@ -27,6 +29,43 @@ export function ChatbotProvider({ children }) {
   const [isLoading, setIsLoading] = useState(false);
   const [position, setPosition] = useState({ x: 20, y: 20 });
   const [unreadCount, setUnreadCount] = useState(0);
+  const sessionIdRef = useRef(`session_${Date.now()}`);
+  const [currentUserId, setCurrentUserId] = useState(null);
+
+  // Allow external code (AuthContext) to set the user id for Firestore persistence
+  const setUserId = useCallback((uid) => {
+    setCurrentUserId(uid);
+  }, []);
+
+  // Persist a single chat message to Firestore (fire-and-forget)
+  const persistMessage = useCallback(
+    (msg) => {
+      if (!currentUserId) return; // guest users – skip persistence
+      const sid = sessionIdRef.current;
+
+      // Ensure parent docs exist so admin queries can discover them
+      const userDocRef = doc(db, 'chat_history', currentUserId);
+      setDoc(userDocRef, { lastMessageAt: Timestamp.now() }, { merge: true }).catch(() => {});
+
+      const sessionDocRef = doc(db, 'chat_history', currentUserId, 'sessions', sid);
+      setDoc(sessionDocRef, { startedAt: Timestamp.now() }, { merge: true }).catch(() => {});
+
+      const messagesRef = collection(
+        db,
+        'chat_history',
+        currentUserId,
+        'sessions',
+        sid,
+        'messages'
+      );
+      addDoc(messagesRef, {
+        role: msg.role,
+        content: msg.content,
+        timestamp: Timestamp.now(),
+      }).catch((err) => console.error('Failed to persist chat message:', err));
+    },
+    [currentUserId]
+  );
 
   // Load chat history and widget state from session storage on mount
   useEffect(() => {
@@ -116,6 +155,7 @@ export function ChatbotProvider({ children }) {
 
     // Add user message to state
     setMessages((prev) => [...prev, userMessage]);
+    persistMessage(userMessage);
     setIsLoading(true);
 
     try {
@@ -157,6 +197,7 @@ export function ChatbotProvider({ children }) {
 
       // Add assistant message and trim history
       setMessages((prev) => trimMessageHistory([...prev, assistantMessage]));
+      persistMessage(assistantMessage);
 
       // Increment unread count if widget is closed
       if (!isOpen) {
@@ -177,7 +218,7 @@ export function ChatbotProvider({ children }) {
     } finally {
       setIsLoading(false);
     }
-  }, [messages, isOpen, trimMessageHistory]);
+  }, [messages, isOpen, trimMessageHistory, persistMessage]);
 
   // Clear chat history
   const clearChat = useCallback(() => {
@@ -218,6 +259,7 @@ export function ChatbotProvider({ children }) {
     clearChat,
     toggleChatbot,
     updatePosition,
+    setUserId,
   };
 
   return (

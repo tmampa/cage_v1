@@ -2,6 +2,7 @@ import './globals.css';
 import { AuthProvider } from '../context/AuthContext';
 import { ChatbotProvider } from '../context/ChatbotContext';
 import ChatbotWidget from '../components/ChatbotWidget';
+import ChatUserSync from '../components/ChatUserSync';
 
 export const metadata = {
   title: 'CagE - Cybersecurity Game',
@@ -15,6 +16,7 @@ export default function RootLayout({ children }) {
       <body>
         <AuthProvider>
           <ChatbotProvider>
+            <ChatUserSync />
             {children}
             <ChatbotWidget />
           </ChatbotProvider>

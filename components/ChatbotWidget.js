@@ -14,11 +14,6 @@ import { useChatbot } from '../context/ChatbotContext';
 
 export default function ChatbotWidget() {
   const pathname = usePathname();
-  
-  // Hide chatbot on profile page
-  if (pathname === '/profile') {
-    return null;
-  }
   const {
     messages,
     isOpen,
@@ -44,6 +39,11 @@ export default function ChatbotWidget() {
   const [currentPosition, setCurrentPosition] = useState(position);
   const widgetRef = useRef(null);
   const messagesEndRef = useRef(null);
+
+  // Hide chatbot on profile page (after all hooks)
+  if (pathname === '/profile') {
+    return null;
+  }
 
   // Auto-scroll to bottom when new messages arrive or loading state changes
   useEffect(() => {
