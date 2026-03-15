@@ -45,6 +45,7 @@ import {
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import React from 'react';
 import { extractQuestionContext, throttle } from '../../../../utils/chatbotContext';
+import { playCorrect, playWrong, playLevelComplete, playGameOver, playAchievement } from '../../../../utils/sounds';
 
 // Difficulty-based scoring and timer configuration
 const DIFFICULTY_CONFIG = {
@@ -267,6 +268,7 @@ export default function GameplayPage({ params }) {
     }
 
     setLevelComplete(true);
+    playLevelComplete();
 
     // Update final user stats for achievement checking
     const finalStats = {
@@ -298,6 +300,7 @@ export default function GameplayPage({ params }) {
       const newAchievements = checkAchievements(finalStats, userAchievements);
       if (newAchievements.length > 0) {
         // Show the first new achievement
+        playAchievement();
         setNewAchievement(newAchievements[0]);
         // Add to user achievements
         const allAchievements = [...userAchievements, ...newAchievements];
@@ -464,6 +467,7 @@ export default function GameplayPage({ params }) {
     }]);
 
     if (isCorrect) {
+      playCorrect();
       // Calculate points: base + time bonus for fast answers
       const timeBonus = timeLeft > (diffConfig.timer * 0.5) ? diffConfig.timeBonus : 0;
       const pointsEarned = diffConfig.basePoints + timeBonus;
@@ -513,10 +517,12 @@ export default function GameplayPage({ params }) {
       });
       
     } else {
+      playWrong();
       // Wrong answer
       setLives(prevLives => {
         const newLives = prevLives - 1;
         if (newLives <= 0) {
+          playGameOver();
           setGameOver(true);
         }
         return newLives;
