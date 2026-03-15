@@ -1,10 +1,12 @@
 // This system generates all questions dynamically using AI (Gemini).
 // Fallback questions have been intentionally removed to ensure all questions are unique and AI-generated.
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 
 // Initialize the Gemini API with your API key
-const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY);
+const ai = new GoogleGenAI({
+  apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY,
+});
 
 // Track pending requests to prevent duplicate API calls
 const pendingRequests = {};
@@ -247,20 +249,8 @@ export async function generateQuestionsForLevel(levelId) {
       try {
         const prompt = createPromptForLevel(level);
 
-        // Configure model for better JSON output - using stable model
-        const model = genAI.getGenerativeModel({
-          model: "gemini-2.5-flash", // Most stable model
-          generationConfig: {
-            temperature: 0.5, // Lower temperature for more consistent output
-            topP: 0.8,
-            topK: 20,
-            maxOutputTokens: 4000, // Increased for longer responses
-            candidateCount: 1, // Single response for consistency
-          },
-        });
-
         // Add retry logic for API failures
-        let result, response, text;
+        let result, text;
         let retryCount = 0;
         const maxRetries = 3;
 
@@ -275,9 +265,19 @@ export async function generateQuestionsForLevel(levelId) {
               `Requesting ${level.questionsCount} questions for: ${level.title}`
             );
 
-            result = await model.generateContent(prompt);
-            response = await result.response;
-            text = response.text();
+            result = await ai.models.generateContent({
+              model: "gemini-3-flash-preview",
+              contents: prompt,
+              generationConfig: {
+                temperature: 0.5,
+                topP: 0.8,
+                topK: 20,
+                maxOutputTokens: 4000,
+                candidateCount: 1,
+              },
+            });
+
+            text = result.text;
 
             console.log(
               `Received response length: ${text?.length || 0} characters`
@@ -407,11 +407,19 @@ DIFFICULTY: ${level.difficulty}
 These questions should be DIFFERENT from any previous questions but still about the same topic.
 Return only the JSON array with ${additionalNeeded} questions, no additional text.`;
 
-            const additionalResult = await model.generateContent(
-              additionalPrompt
-            );
-            const additionalResponse = await additionalResult.response;
-            const additionalText = additionalResponse.text();
+            const additionalResult = await ai.models.generateContent({
+              model: "gemini-3-flash-preview",
+              contents: additionalPrompt,
+              generationConfig: {
+                temperature: 0.5,
+                topP: 0.8,
+                topK: 20,
+                maxOutputTokens: 4000,
+                candidateCount: 1,
+              },
+            });
+
+            const additionalText = additionalResult.text;
 
             // Clean and parse additional questions
             let cleanedAdditionalText = additionalText;

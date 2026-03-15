@@ -3,7 +3,8 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // User profiles
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
 
     // Progress collection - allow both document access and queries
@@ -43,6 +44,20 @@ service cloud.firestore {
     match /leaderboard/{userId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Feedback – any authenticated user can create; only the author can read their own
+    match /feedback/{docId} {
+      allow create: if request.auth != null;
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+
+    // Chat history – users can read/write their own sessions
+    match /chat_history/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    match /chat_history/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }

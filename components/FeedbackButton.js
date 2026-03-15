@@ -10,6 +10,8 @@ import {
 } from '@heroicons/react/24/solid';
 import { useAuth } from '../context/AuthContext';
 import emailjs from '@emailjs/browser';
+import { db } from '../lib/firebase';
+import { collection, addDoc, Timestamp } from 'firebase/firestore';
 
 export default function FeedbackButton() {
   const { user, userProfile } = useAuth();
@@ -75,14 +77,36 @@ export default function FeedbackButton() {
       console.log('Sending feedback with EmailJS...', { serviceId, templateId });
       console.log('Template parameters:', templateParams);
 
-      // Send email using EmailJS (public key already initialized)
-      const result = await emailjs.send(
-        serviceId,
-        templateId,
-        templateParams
-      );
+      // Persist feedback to Firestore first (so admin dashboard always gets it)
+      try {
+        await addDoc(collection(db, 'feedback'), {
+          userId: user?.id || 'guest',
+          username: userProfile?.username || 'Anonymous',
+          email: email || user?.email || 'anonymous@cage-game.com',
+          feedbackType,
+          rating,
+          message: feedback,
+          userScoreAtTime: userProfile?.score || 0,
+          resolved: false,
+          createdAt: Timestamp.now(),
+        });
+        console.log('Feedback persisted to Firestore');
+      } catch (firestoreError) {
+        console.error('Failed to persist feedback to Firestore:', firestoreError);
+      }
 
-      console.log('Feedback sent successfully:', result.text);
+      // Send email using EmailJS (public key already initialized)
+      try {
+        const result = await emailjs.send(
+          serviceId,
+          templateId,
+          templateParams
+        );
+        console.log('Feedback sent successfully:', result.text);
+      } catch (emailError) {
+        console.error('EmailJS failed (feedback still saved):', emailError.text || emailError.message);
+      }
+
       setSubmitStatus('success');
       
       // Reset form after 2 seconds
