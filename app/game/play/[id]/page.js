@@ -99,6 +99,10 @@ export default function GameplayPage({ params }) {
   // Ref for the timer
   const timerRef = React.useRef(null);
 
+  // Ref to keep latest userStats accessible in closures (avoids stale state)
+  const userStatsRef = React.useRef(userStats);
+  React.useEffect(() => { userStatsRef.current = userStats; }, [userStats]);
+
   // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -271,13 +275,20 @@ export default function GameplayPage({ params }) {
     setLevelComplete(true);
     playLevelComplete();
 
-    // Update final user stats for achievement checking
+    // Build final stats from the ref (latest state) to avoid stale closure
+    const latestStats = userStatsRef.current;
+    const sessionCorrect = answeredQuestions.filter(q => q.isCorrect).length;
+    const sessionTotal = answeredQuestions.length;
     const finalStats = {
-      ...userStats,
-      levelsCompleted: passed ? userStats.levelsCompleted + 1 : userStats.levelsCompleted,
-      perfectScores: isPerfectScore ? userStats.perfectScores + 1 : userStats.perfectScores,
-      noHintLevels: hintsRemaining === 3 && passed ? userStats.noHintLevels + 1 : userStats.noHintLevels,
-      comebacks: isComeback ? (userStats.comebacks || 0) + 1 : (userStats.comebacks || 0),
+      ...latestStats,
+      correctAnswers: (latestStats.correctAnswers || 0) + sessionCorrect,
+      totalAnswers: (latestStats.totalAnswers || 0) + sessionTotal,
+      maxStreak: Math.max(latestStats.maxStreak || 0, maxStreak),
+      fastestAnswer: Math.min(latestStats.fastestAnswer || Infinity, fastestAnswer),
+      levelsCompleted: passed ? (latestStats.levelsCompleted || 0) + 1 : (latestStats.levelsCompleted || 0),
+      perfectScores: isPerfectScore ? (latestStats.perfectScores || 0) + 1 : (latestStats.perfectScores || 0),
+      noHintLevels: hintsRemaining === 3 && passed ? (latestStats.noHintLevels || 0) + 1 : (latestStats.noHintLevels || 0),
+      comebacks: isComeback ? (latestStats.comebacks || 0) + 1 : (latestStats.comebacks || 0),
     };
 
     // Update the user stats state
@@ -484,38 +495,30 @@ export default function GameplayPage({ params }) {
       // Track fastest answer
       setFastestAnswer(prev => Math.min(prev, answerTime));
       
-      // Update user stats
-      setUserStats(prev => {
-        const newStats = {
-          ...prev,
-          correctAnswers: prev.correctAnswers + 1,
-          totalAnswers: prev.totalAnswers + 1,
-          maxStreak: Math.max(prev.maxStreak, currentStreak + 1),
-          fastestAnswer: Math.min(prev.fastestAnswer, answerTime)
+      // Check for mid-game achievements using session data
+      try {
+        const sessionCorrectSoFar = answeredQuestions.filter(q => q.isCorrect).length + 1;
+        const sessionTotalSoFar = answeredQuestions.length + 1;
+        const midGameStats = {
+          ...userStatsRef.current,
+          correctAnswers: (userStatsRef.current.correctAnswers || 0) + sessionCorrectSoFar,
+          totalAnswers: (userStatsRef.current.totalAnswers || 0) + sessionTotalSoFar,
+          maxStreak: Math.max(userStatsRef.current.maxStreak || 0, currentStreak + 1),
         };
-        console.log('Updated stats after correct answer:', newStats);
-        
-        // Check for achievements immediately
-        try {
-          const newAchievements = checkAchievements(newStats, userAchievements);
-          if (newAchievements.length > 0) {
-            const allAch = [...userAchievements, ...newAchievements];
-            setNewAchievement(newAchievements[0]);
-            setUserAchievements(allAch);
-            console.log('🏆 Achievement earned during gameplay:', newAchievements[0]);
-            // Persist achievements to Firestore
-            if (user?.id) {
-              saveFirebaseAchievements(user.id, allAch).catch(e =>
-                console.error('Error persisting mid-game achievement:', e)
-              );
-            }
+        const newAchievements = checkAchievements(midGameStats, userAchievements);
+        if (newAchievements.length > 0) {
+          const allAch = [...userAchievements, ...newAchievements];
+          setNewAchievement(newAchievements[0]);
+          setUserAchievements(allAch);
+          if (user?.id) {
+            saveFirebaseAchievements(user.id, allAch).catch(e =>
+              console.error('Error persisting mid-game achievement:', e)
+            );
           }
-        } catch (error) {
-          console.error('Error checking achievements during gameplay:', error);
         }
-        
-        return newStats;
-      });
+      } catch (error) {
+        console.error('Error checking achievements during gameplay:', error);
+      }
       
     } else {
       playWrong();
@@ -532,34 +535,27 @@ export default function GameplayPage({ params }) {
       // Reset streak on wrong answer
       setCurrentStreak(0);
       
-      // Update user stats
-      setUserStats(prev => {
-        const newStats = {
-          ...prev,
-          totalAnswers: prev.totalAnswers + 1
+      // Check for mid-game achievements (e.g. "Brave Beginner" for first attempt)
+      try {
+        const sessionTotalSoFar = answeredQuestions.length + 1;
+        const midGameStats = {
+          ...userStatsRef.current,
+          totalAnswers: (userStatsRef.current.totalAnswers || 0) + sessionTotalSoFar,
         };
-        console.log('Updated stats after wrong answer:', newStats);
-        
-        // Check for achievements (like "Brave Beginner" for first attempt)
-        try {
-          const newAchievements = checkAchievements(newStats, userAchievements);
-          if (newAchievements.length > 0) {
-            const allAch = [...userAchievements, ...newAchievements];
-            setNewAchievement(newAchievements[0]);
-            setUserAchievements(allAch);
-            console.log('🏆 Achievement earned during gameplay:', newAchievements[0]);
-            if (user?.id) {
-              saveFirebaseAchievements(user.id, allAch).catch(e =>
-                console.error('Error persisting mid-game achievement:', e)
-              );
-            }
+        const newAchievements = checkAchievements(midGameStats, userAchievements);
+        if (newAchievements.length > 0) {
+          const allAch = [...userAchievements, ...newAchievements];
+          setNewAchievement(newAchievements[0]);
+          setUserAchievements(allAch);
+          if (user?.id) {
+            saveFirebaseAchievements(user.id, allAch).catch(e =>
+              console.error('Error persisting mid-game achievement:', e)
+            );
           }
-        } catch (error) {
-          console.error('Error checking achievements during gameplay:', error);
         }
-        
-        return newStats;
-      });
+      } catch (error) {
+        console.error('Error checking achievements during gameplay:', error);
+      }
     }
 
     setShowExplanation(true);

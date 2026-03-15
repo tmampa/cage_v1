@@ -29,6 +29,8 @@ import {
   getDocs,
   doc,
   getDoc,
+  setDoc,
+  Timestamp,
 } from 'firebase/firestore';
 import { getFirebaseUserStats, getFirebaseAchievements } from '../../../lib/firebase';
 import { getAchievementProgress } from '../../../utils/achievements';
@@ -159,7 +161,7 @@ export default function LevelsPage() {
           userProgress.push(doc.data());
         });
 
-        // Find the highest completed level
+        // Find the highest completed level from level_progress docs
         const completedLevelIds = userProgress
           .filter(p => p.completed)
           .map(p => p.level_id);
@@ -167,16 +169,51 @@ export default function LevelsPage() {
           ? Math.max(...completedLevelIds) 
           : 0;
 
+        // Also check user_stats for levelsCompleted (updated on every level completion)
+        let statsLevelsCompleted = 0;
+        try {
+          const stats = await getFirebaseUserStats(user.id);
+          if (stats) {
+            setUserStats(stats);
+            statsLevelsCompleted = stats.levelsCompleted || 0;
+          }
+        } catch (statsError) {
+          console.error('Error loading user stats:', statsError);
+        }
+
+        // Reconcile from all sources: highestLevel, level_progress docs, and user_stats
+        const inferredCompletedUpTo = Math.max(highestLevel - 1, highestCompletedLevel, statsLevelsCompleted);
+
+        // Backfill missing level_progress docs for levels that should be marked completed
+        for (let lvl = 1; lvl <= inferredCompletedUpTo; lvl++) {
+          const existingProgress = userProgress.find(p => p.level_id === lvl);
+          if (!existingProgress || !existingProgress.completed) {
+            try {
+              const progressDocRef = doc(db, 'level_progress', `${user.id}_${lvl}`);
+              await setDoc(progressDocRef, {
+                user_id: user.id,
+                level_id: lvl,
+                score: existingProgress?.score || 0,
+                completed: true,
+                last_played_at: Timestamp.now(),
+                created_at: existingProgress?.created_at || Timestamp.now(),
+              });
+            } catch (backfillErr) {
+              console.warn(`Could not backfill level_progress for level ${lvl}:`, backfillErr);
+            }
+          }
+        }
+
         // Update levels with unlocked and completed status
         const updatedLevels = levels.map((level) => {
           const progress = userProgress.find((p) => p.level_id === level.id);
-          const isCompleted = progress?.completed || false;
+          const isCompleted = progress?.completed || level.id <= inferredCompletedUpTo;
           const levelScore = progress?.score || 0;
           
           // Unlock level 1 by default, or if it's completed, or if previous level is completed
           const isUnlocked = level.id === 1 || 
                             level.id <= highestLevel || 
-                            level.id <= highestCompletedLevel + 1;
+                            level.id <= inferredCompletedUpTo + 1;
 
           return {
             ...level,
@@ -201,16 +238,6 @@ export default function LevelsPage() {
           progressPercentage,
           completedLevels: updatedLevels.filter(l => l.completed).map(l => l.id),
         });
-
-        // Load real user stats from Firestore
-        try {
-          const stats = await getFirebaseUserStats(user.id);
-          if (stats) {
-            setUserStats(stats);
-          }
-        } catch (statsError) {
-          console.error('Error loading user stats:', statsError);
-        }
 
         // Load recent achievements from Firestore (fall back to localStorage)
         try {
