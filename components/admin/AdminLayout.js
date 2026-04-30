@@ -1,13 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   ChartBarIcon,
   EnvelopeIcon,
   HomeIcon,
+  ArrowRightStartOnRectangleIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline';
+import { useAuth } from '../../context/AuthContext';
 
 const navItems = [
   { label: 'Overview', href: '/admin', icon: HomeIcon },
@@ -23,6 +25,13 @@ function isActivePath(pathname, href) {
 
 export function AdminShell({ title, description, eyebrow, actions, children }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { logout } = useAuth();
+
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/auth/login');
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 [font-family:ui-sans-serif,system-ui,sans-serif]">
@@ -41,6 +50,14 @@ export function AdminShell({ title, description, eyebrow, actions, children }) {
 
             <div className="flex items-center gap-2">
               {actions}
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="inline-flex items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+              >
+                <ArrowRightStartOnRectangleIcon className="h-4 w-4" />
+                Log out
+              </button>
             </div>
           </div>
 
