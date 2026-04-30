@@ -284,10 +284,14 @@ export default function LevelMap({ levels, userProgress = {} }) {
                       </div>
                     </div>
 
-                    {isCompleted && userScore > 0 && (
+                    {userScore > 0 && (
                       <div className="mt-2 pt-2 border-t border-gray-200">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-green-600 font-medium">Completed!</span>
+                          {isCompleted ? (
+                            <span className="text-green-600 font-medium">Completed!</span>
+                          ) : (
+                            <span className="text-orange-600 font-medium">Best Attempt</span>
+                          )}
                           <span className="text-gray-600">Score: {userScore}</span>
                         </div>
                       </div>

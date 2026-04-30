@@ -122,14 +122,15 @@ export default function EnhancedLevelCard({
             </div>
           </div>
           
-          {isCompleted && (
+          {userScore > 0 && (
             <div className="flex items-center gap-3">
-              {userScore > 0 && (
-                <div className="flex items-center gap-1">
-                  <StarIcon className="w-3 h-3 text-yellow-500" />
-                  <span className="font-medium text-gray-700">{userScore}</span>
-                </div>
-              )}
+              <div className="flex items-center gap-1">
+                <StarIcon className="w-3 h-3 text-yellow-500" />
+                <span className="font-medium text-gray-700">{userScore}</span>
+                {!isCompleted && (
+                  <span className="text-orange-600 text-[10px] ml-1">(best)</span>
+                )}
+              </div>
               {bestTime && (
                 <div className="flex items-center gap-1">
                   <ClockIcon className="w-3 h-3 text-blue-500" />
@@ -171,14 +172,18 @@ export default function EnhancedLevelCard({
         )}
       </div>
 
-      {/* Progress indicator for completed levels */}
-      {isCompleted && userScore > 0 && (
+      {/* Progress indicator for all attempts with scores */}
+      {userScore > 0 && (
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-200">
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${Math.min((userScore / level.points) * 100, 100)}%` }}
             transition={{ duration: 1, delay: 0.5 }}
-            className="h-full bg-gradient-to-r from-yellow-400 to-orange-500"
+            className={`h-full ${
+              isCompleted 
+                ? 'bg-gradient-to-r from-yellow-400 to-orange-500'
+                : 'bg-gradient-to-r from-orange-300 to-orange-400'
+            }`}
           />
         </div>
       )}

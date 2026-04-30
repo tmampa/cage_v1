@@ -68,5 +68,88 @@
       }
     ],
     "timestamp": 1777531887132
+  },
+  "2": {
+    "questions": [
+      {
+        "question": "You are creating a new password for your online banking account. Which of the following would be considered the strongest and most secure password?",
+        "options": [
+          "password123",
+          "Blue-Octopus-Rain-99!",
+          "Qwerty!",
+          "Admin2024"
+        ],
+        "correctIndex": 1,
+        "explanation": "A long passphrase that combines multiple unrelated words with numbers and symbols is much harder for hackers to guess or crack compared to common words or short sequences.",
+        "hint": "Think about which option is the longest and contains the most variety of character types.",
+        "levelId": 2
+      },
+      {
+        "question": "Why is it considered dangerous to use the same password for your email, social media, and bank accounts?",
+        "options": [
+          "It takes longer to type the same password multiple times.",
+          "It makes the password easier to remember.",
+          "Websites will automatically delete accounts with duplicate passwords.",
+          "If one account is breached, a hacker can access all your other accounts."
+        ],
+        "correctIndex": 3,
+        "explanation": "This practice is called 'credential stuffing.' If a hacker steals your password from a low-security site, they will immediately try that same password on more sensitive sites like your email or bank.",
+        "hint": "Think about the risk involved if a single 'key' opens every door you own.",
+        "levelId": 2
+      },
+      {
+        "question": "What is the primary purpose of using a Password Manager?",
+        "options": [
+          "To share your passwords with friends and family easily.",
+          "To automatically change your passwords every single day.",
+          "To help you remember one master password while it stores and encrypts many unique, complex passwords.",
+          "To bypass the need for any passwords on your favorite websites."
+        ],
+        "correctIndex": 2,
+        "explanation": "Password managers securely store your login information so you can use unique, complex passwords for every site without having to memorize them all.",
+        "hint": "Focus on the tool's ability to act as a secure 'vault' for all your different login credentials.",
+        "levelId": 2
+      },
+      {
+        "question": "You log into your account and are prompted to enter a 6-digit code sent to your phone via SMS. What is this security measure called?",
+        "options": [
+          "Biometric Scanning",
+          "Password Recovery",
+          "Phishing",
+          "Two-Factor Authentication (2FA)"
+        ],
+        "correctIndex": 3,
+        "explanation": "Two-Factor Authentication (2FA) adds a second layer of security. Even if a hacker knows your password, they cannot access your account without the second 'factor' (the code from your phone).",
+        "hint": "This term refers to needing two different pieces of evidence to prove who you are.",
+        "levelId": 2
+      },
+      {
+        "question": "You receive an urgent email from 'Technical Support' claiming your account is locked and asking you to reply with your password to verify your identity. What should you do?",
+        "options": [
+          "Delete the email or report it as phishing, as legitimate companies will never ask for your password.",
+          "Send a hint to your password instead of the full password.",
+          "Change your password to something simple then send it to them.",
+          "Reply immediately so you don't lose access to your account."
+        ],
+        "correctIndex": 0,
+        "explanation": "Legitimate service providers will never ask for your password via email or phone. This is a common tactic used by scammers to steal credentials.",
+        "hint": "Real companies have systems to verify you without ever needing to see your actual password.",
+        "levelId": 2
+      },
+      {
+        "question": "Which of the following is a secure way to keep track of your passwords if you find them hard to remember?",
+        "options": [
+          "Saving them in a plain text file on your desktop named 'Passwords.txt'.",
+          "Using a reputable, encrypted digital password manager.",
+          "Using your pet's name followed by your birth year for every account.",
+          "Writing them on a sticky note attached to your monitor."
+        ],
+        "correctIndex": 1,
+        "explanation": "An encrypted password manager is the only secure option listed. Physical notes can be seen by others, and plain text files can be easily read if your computer is compromised.",
+        "hint": "Look for the option that uses 'encryption' to hide the information from prying eyes.",
+        "levelId": 2
+      }
+    ],
+    "timestamp": 1777580420026
   }
 }

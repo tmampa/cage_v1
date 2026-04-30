@@ -30,21 +30,35 @@ export async function getProgressEntry(userId, levelId) {
 }
 
 /**
- * Upsert progress for a user/level pair, only improving the score
- * if the level was already completed. Mirrors the previous inline logic
- * in `app/api/progress/route.js`.
+ * Upsert progress for a user/level pair, always storing the best score
+ * regardless of completion status. This allows tracking progress even
+ * when levels are not passed.
  */
 export async function upsertProgressWithBestScore({ userId, levelId, score, completed }) {
   const existing = await getProgressEntry(userId, levelId);
 
   if (existing) {
-    const shouldUpdate = !existing.completed || score > existing.score;
+    // Always update if the new score is better, or if completing for the first time
+    const shouldUpdate = score > existing.score || (completed && !existing.completed);
     if (shouldUpdate) {
       await db
         .update(levelProgress)
         .set({
-          score,
+          score: Math.max(score, existing.score), // Keep the best score
           completed: completed || existing.completed,
+          lastPlayedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(levelProgress.userId, Number(userId)),
+            eq(levelProgress.levelId, Number(levelId))
+          )
+        );
+    } else {
+      // Even if score didn't improve, update lastPlayedAt
+      await db
+        .update(levelProgress)
+        .set({
           lastPlayedAt: new Date(),
         })
         .where(
@@ -57,6 +71,7 @@ export async function upsertProgressWithBestScore({ userId, levelId, score, comp
     return;
   }
 
+  // Insert new progress entry regardless of completion status
   await db.insert(levelProgress).values({
     userId: Number(userId),
     levelId: Number(levelId),

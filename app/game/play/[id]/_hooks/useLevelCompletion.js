@@ -82,6 +82,7 @@ export function useLevelCompletion(deps) {
         console.error('Error checking achievements:', err);
       }
 
+      // Always save progress, even if the level wasn't passed
       try {
         await fetch('/api/progress', {
           method: 'POST',
