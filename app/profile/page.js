@@ -166,11 +166,6 @@ function ProfilePage() {
 
   const formatJoinedDate = (dateValue) => {
     try {
-      // Handle Firebase Timestamp objects
-      if (dateValue && typeof dateValue === 'object' && dateValue.toDate) {
-        return dateValue.toDate().toLocaleDateString();
-      }
-
       // Handle ISO strings or other date formats
       if (dateValue) {
         return new Date(dateValue).toLocaleDateString();
