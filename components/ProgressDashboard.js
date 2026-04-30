@@ -19,7 +19,8 @@ export default function ProgressDashboard({
   userProfile, 
   progressStats, 
   levels,
-  recentAchievements = []
+  recentAchievements = [],
+  userStats = null
 }) {
   // Get the last played level from localStorage
   const getLastPlayedLevel = () => {
@@ -75,15 +76,17 @@ export default function ProgressDashboard({
     {
       icon: <StarIcon className="w-6 h-6 text-purple-500" />,
       label: "Accuracy Rate",
-      value: "85%", // This would be calculated from actual game data
-      subtext: "Keep it up!",
+      value: userStats && userStats.totalAnswers > 0
+        ? `${Math.round((userStats.correctAnswers / userStats.totalAnswers) * 100)}%`
+        : "—",
+      subtext: userStats && userStats.totalAnswers > 0 ? "Keep it up!" : "Play to track",
       color: "from-purple-400 to-pink-500"
     },
     {
       icon: <FireIcon className="w-6 h-6 text-red-500" />,
-      label: "Current Streak",
-      value: "3", // This would come from game stats
-      subtext: "questions in a row",
+      label: "Best Streak",
+      value: userStats ? `${userStats.maxStreak || 0}` : "—",
+      subtext: "correct in a row",
       color: "from-red-400 to-orange-500"
     }
   ];

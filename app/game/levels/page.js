@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ArrowLeftIcon,
   TrophyIcon,
@@ -21,20 +22,13 @@ import LevelMap from '../../../components/LevelMap';
 import ProgressDashboard from '../../../components/ProgressDashboard';
 import LevelFilters from '../../../components/LevelFilters';
 import EnhancedButton from '../../../components/EnhancedButton';
-import { db } from '../../../lib/firebase';
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  doc,
-  getDoc,
-} from 'firebase/firestore';
 import { getAchievementProgress } from '../../../utils/achievements';
 import { extractLevelsContext, throttle } from '../../../utils/chatbotContext';
+import BottomNav from '../../../components/BottomNav';
 
 export default function LevelsPage() {
   const { user, userProfile } = useAuth();
+  const router = useRouter();
 
   // State for levels and user progress
   const [levels, setLevels] = useState([
@@ -123,6 +117,9 @@ export default function LevelsPage() {
   // Recent achievements state
   const [recentAchievements, setRecentAchievements] = useState([]);
 
+  // Real user stats from Firestore
+  const [userStats, setUserStats] = useState(null);
+
   // New state for enhanced UI
   const [viewMode, setViewMode] = useState('map'); // 'map', 'grid'
   const [filters, setFilters] = useState({
@@ -131,77 +128,52 @@ export default function LevelsPage() {
     sort: 'order'
   });
 
-  // Load user progress from Firebase
+  useEffect(() => {
+    if (user?.isAdmin) {
+      router.replace('/admin');
+    }
+  }, [user?.isAdmin, router]);
+
+  // Load user progress from API
   useEffect(() => {
     const loadUserProgress = async () => {
-      if (!user?.id) return;
+      if (!user?.id || user.isAdmin) return;
 
       try {
-        // Get user's profile for highest level
-        const userRef = doc(db, 'users', user.id);
-        const userDoc = await getDoc(userRef);
-        const highestLevel = userDoc.exists()
-          ? userDoc.data().highestLevel || 1
-          : 1;
+        const res = await fetch('/api/progress');
+        const data = await res.json();
+        const userProgress = data.progress || [];
 
-        // Get all progress documents for this user
-        const progressRef = collection(db, 'progress');
-        const q = query(progressRef, where('userId', '==', user.id));
-        const querySnapshot = await getDocs(q);
-
-        const userProgress = [];
-        querySnapshot.forEach((doc) => {
-          userProgress.push(doc.data());
-        });
-
-        // Find the highest completed level
         const completedLevelIds = userProgress
-          .filter(p => p.passed)
+          .filter(p => p.completed)
           .map(p => p.levelId);
-        const highestCompletedLevel = completedLevelIds.length > 0 
-          ? Math.max(...completedLevelIds) 
+        const highestCompletedLevel = completedLevelIds.length > 0
+          ? Math.max(...completedLevelIds)
           : 0;
 
-        // Update levels with unlocked and completed status
         const updatedLevels = levels.map((level) => {
           const progress = userProgress.find((p) => p.levelId === level.id);
-          const isCompleted = progress?.passed || false;
+          const isCompleted = progress?.completed || false;
           const levelScore = progress?.score || 0;
-          
-          // Unlock level 1 by default, or if it's completed, or if previous level is completed
-          const isUnlocked = level.id === 1 || 
-                            level.id <= highestLevel || 
-                            level.id <= highestCompletedLevel + 1;
+          const isUnlocked = level.id === 1 || level.id <= highestCompletedLevel + 1;
 
-          return {
-            ...level,
-            unlocked: isUnlocked,
-            completed: isCompleted,
-            userScore: levelScore,
-          };
+          return { ...level, unlocked: isUnlocked, completed: isCompleted, userScore: levelScore };
         });
 
         setLevels(updatedLevels);
 
-        // Calculate progress stats
-        const unlockedCount = updatedLevels.filter((l) => l.unlocked).length;
-        const completedCount = updatedLevels.filter((l) => l.completed).length;
-        const progressPercentage = Math.round(
-          (completedCount / updatedLevels.length) * 100
-        );
-
+        const completedCount = updatedLevels.filter(l => l.completed).length;
         setProgressStats({
-          unlockedCount,
+          unlockedCount: updatedLevels.filter(l => l.unlocked).length,
           completedCount,
-          progressPercentage,
+          progressPercentage: Math.round((completedCount / updatedLevels.length) * 100),
           completedLevels: updatedLevels.filter(l => l.completed).map(l => l.id),
         });
 
-        // Load recent achievements from localStorage
+        // Load achievements from localStorage
         const storedAchievements = localStorage.getItem(`achievements_${user.id}`);
         if (storedAchievements) {
           const achievements = JSON.parse(storedAchievements);
-          // Sort by earnedAt date and take the 5 most recent
           const recent = achievements
             .filter(a => a.earnedAt)
             .sort((a, b) => new Date(b.earnedAt) - new Date(a.earnedAt))
@@ -214,7 +186,8 @@ export default function LevelsPage() {
     };
 
     loadUserProgress();
-  }, [user?.id]);
+  }, [user?.id, user?.isAdmin]);
+
 
   // Filter and sort levels based on current filters
   const getFilteredLevels = () => {
@@ -361,6 +334,7 @@ export default function LevelsPage() {
           progressStats={progressStats}
           levels={levels}
           recentAchievements={recentAchievements}
+          userStats={userStats}
         />
 
         {/* Level Filters (only show in grid mode) */}
@@ -452,38 +426,7 @@ export default function LevelsPage() {
       </div>
 
       {/* Bottom Navigation */}
-      <div className='fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md shadow-lg z-30 border-t border-gray-200'>
-        <div className='flex justify-around items-center py-2'>
-          <Link href='/' className='flex-1'>
-            <div className='flex flex-col items-center py-2 text-gray-600 hover:text-blue-500 transition-colors'>
-              <HomeIcon className='w-5 h-5' />
-              <span className='text-xs mt-1'>Home</span>
-            </div>
-          </Link>
-
-          <Link href='/game/levels' className='flex-1'>
-            <div className='flex flex-col items-center py-2 text-blue-500 relative'>
-              <PuzzlePieceIcon className='w-5 h-5' />
-              <span className='text-xs mt-1 font-medium'>Levels</span>
-              <div className='absolute -top-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-blue-500 rounded-full'></div>
-            </div>
-          </Link>
-
-          <Link href='/leaderboard' className='flex-1'>
-            <div className='flex flex-col items-center py-2 text-gray-600 hover:text-blue-500 transition-colors'>
-              <TrophyIcon className='w-5 h-5' />
-              <span className='text-xs mt-1'>Leaderboard</span>
-            </div>
-          </Link>
-
-          <Link href='/profile' className='flex-1'>
-            <div className='flex flex-col items-center py-2 text-gray-600 hover:text-blue-500 transition-colors'>
-              <UserIcon className='w-5 h-5' />
-              <span className='text-xs mt-1'>Profile</span>
-            </div>
-          </Link>
-        </div>
-      </div>
+      <BottomNav activeTab="levels" />
 
 
     </div>

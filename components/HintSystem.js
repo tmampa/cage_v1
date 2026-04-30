@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LightBulbIcon, 
@@ -18,6 +18,12 @@ export default function HintSystem({
   const [showHint, setShowHint] = useState(false);
   const [hintUsed, setHintUsed] = useState(false);
 
+  // Reset hint state when question changes
+  useEffect(() => {
+    setShowHint(false);
+    setHintUsed(false);
+  }, [question?.question]);
+
   const handleUseHint = () => {
     if (disabled || hintsRemaining <= 0 || hintUsed) return;
     
@@ -30,9 +36,16 @@ export default function HintSystem({
     setShowHint(!showHint);
   };
 
-  // Generate a hint based on the question and correct answer
+  // Generate a hint based on the question - prefer AI-generated hint if available
   const generateHint = () => {
-    if (!question || !question.options) return "Think carefully about the safest option.";
+    if (!question) return "Think carefully about the safest option.";
+    
+    // Use AI-generated hint from the server if available
+    if (question.hint) {
+      return `💡 ${question.hint}`;
+    }
+    
+    if (!question.options) return "💡 Think carefully about the safest option.";
     
     const correctOption = question.options[question.correctIndex];
     

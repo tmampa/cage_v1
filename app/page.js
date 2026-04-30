@@ -16,15 +16,7 @@ import { useChatbot } from "../context/ChatbotContext";
 
 import EnhancedButton from "../components/EnhancedButton";
 import { AnimatedProgressBar } from "../components/ProgressIndicators";
-import { db } from "../lib/firebase";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  doc,
-  getDoc,
-} from 'firebase/firestore';
+
 import { extractHomeContext } from "../utils/chatbotContext";
 
 export default function Home() {
@@ -65,32 +57,17 @@ export default function Home() {
       }
 
       try {
-        // Get user's profile for highest level
-        const userRef = doc(db, 'users', user.id);
-        const userDoc = await getDoc(userRef);
-        const highestLevel = userDoc.exists() ? userDoc.data().highestLevel || 1 : 1;
-
-        // Get all progress documents for this user
-        const progressRef = collection(db, 'progress');
-        const q = query(progressRef, where('userId', '==', user.id));
-        const querySnapshot = await getDocs(q);
-
-        let completedCount = 0;
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          if (data.passed) {
-            completedCount++;
-          }
-        });
+        const res = await fetch('/api/progress');
+        const data = await res.json();
+        const progress = data.progress || [];
+        const completedCount = progress.filter(p => p.completed).length;
 
         setLevelProgress({
           totalLevels: 6,
           completedLevels: completedCount,
-          unlockedLevels: Math.min(highestLevel + 1, 6), // Next level is unlocked
-          loading: false
+          unlockedLevels: Math.min(completedCount + 1, 6),
+          loading: false,
         });
-
-        console.log(`User progress: ${completedCount}/6 levels completed, ${Math.min(highestLevel + 1, 6)} unlocked`);
       } catch (error) {
         console.error('Error loading user progress:', error);
         setLevelProgress(prev => ({ ...prev, loading: false }));

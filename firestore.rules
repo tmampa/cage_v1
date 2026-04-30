@@ -59,5 +59,15 @@ service cloud.firestore {
     match /chat_history/{userId}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
+
+    // User stats – each user can read/write their own stats doc (keyed by userId)
+    match /user_stats/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // User achievements – each user can read/write their own achievements doc (keyed by userId)
+    match /user_achievements/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
   }
 }

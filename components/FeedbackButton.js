@@ -10,8 +10,7 @@ import {
 } from '@heroicons/react/24/solid';
 import { useAuth } from '../context/AuthContext';
 import emailjs from '@emailjs/browser';
-import { db } from '../lib/firebase';
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import { checkAchievements, DEFAULT_USER_STATS } from '../utils/achievements';
 
 export default function FeedbackButton() {
   const { user, userProfile } = useAuth();
@@ -77,25 +76,22 @@ export default function FeedbackButton() {
       console.log('Sending feedback with EmailJS...', { serviceId, templateId });
       console.log('Template parameters:', templateParams);
 
-      // Persist feedback to Firestore first (so admin dashboard always gets it)
+      // Save feedback to DB
       try {
-        await addDoc(collection(db, 'feedback'), {
-          userId: user?.id || 'guest',
-          username: userProfile?.username || 'Anonymous',
-          email: email || user?.email || 'anonymous@cage-game.com',
-          feedbackType,
-          rating,
-          message: feedback,
-          userScoreAtTime: userProfile?.score || 0,
-          resolved: false,
-          createdAt: Timestamp.now(),
+        await fetch('/api/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            feedbackType,
+            rating,
+            message: feedback,
+          }),
         });
-        console.log('Feedback persisted to Firestore');
-      } catch (firestoreError) {
-        console.error('Failed to persist feedback to Firestore:', firestoreError);
+      } catch (dbError) {
+        console.error('Failed to save feedback:', dbError);
       }
 
-      // Send email using EmailJS (public key already initialized)
+      // Send email using EmailJS
       try {
         const result = await emailjs.send(
           serviceId,
@@ -108,7 +104,7 @@ export default function FeedbackButton() {
       }
 
       setSubmitStatus('success');
-      
+
       // Reset form after 2 seconds
       setTimeout(() => {
         setFeedback('');

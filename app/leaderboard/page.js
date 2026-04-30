@@ -16,11 +16,11 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { useChatbot } from '../../context/ChatbotContext';
-import { getFirebaseLeaderboardData } from '../../lib/firebase';
 
 import EnhancedButton from '../../components/EnhancedButton';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import { extractLeaderboardContext } from '../../utils/chatbotContext';
+import BottomNav from '../../components/BottomNav';
 
 export default function LeaderboardPage() {
   const { user, userProfile } = useAuth();
@@ -38,15 +38,15 @@ export default function LeaderboardPage() {
   async function fetchLeaderboardData() {
     try {
       setLoading(true);
-      const data = await getFirebaseLeaderboardData(timeFilter);
-      setLeaderboardData(data);
+      const res = await fetch(`/api/leaderboard?filter=${timeFilter}`);
+      const data = await res.json();
+      const leaderboard = data.leaderboard || [];
+      setLeaderboardData(leaderboard);
 
       // Find user's rank if they're logged in
       if (user?.id) {
-        const userIndex = data.findIndex((player) => player.userId === user.id);
-        if (userIndex !== -1) {
-          setUserRank(userIndex + 1);
-        }
+        const userIndex = leaderboard.findIndex((player) => player.id === user.id);
+        if (userIndex !== -1) setUserRank(userIndex + 1);
       }
 
       setError(null);
@@ -277,11 +277,11 @@ export default function LeaderboardPage() {
             >
               {filteredData.map((player, index) => {
                 const rankStyling = getRankStyling(index);
-                const isCurrentUser = player.userId === user?.id;
+                const isCurrentUser = player.id === user?.id;
                 
                 return (
                   <motion.div
-                    key={player.userId}
+                    key={player.id}
                     variants={itemVariants}
                     whileHover={{ scale: 1.02, y: -2 }}
                     className={`
@@ -322,7 +322,7 @@ export default function LeaderboardPage() {
                         w-12 h-12 rounded-full flex items-center justify-center text-2xl mr-4
                         ${index < 3 ? 'bg-white shadow-md' : 'bg-gray-100'}
                       `}>
-                        {player.avatar_emoji || '👤'}
+                          {player.avatarEmoji || '👤'}
                       </div>
 
                       {/* Player Info */}
@@ -380,37 +380,7 @@ export default function LeaderboardPage() {
       </div>
 
       {/* Bottom navigation */}
-      <div className='fixed bottom-0 left-0 right-0 bg-white shadow-lg z-30'>
-        <div className='flex justify-around items-center'>
-          <Link href='/game/levels' className='flex-1'>
-            <div className='flex flex-col items-center py-3 text-blue-600'>
-              <HomeIcon className='w-6 h-6' />
-              <span className='text-xs mt-1'>Home</span>
-            </div>
-          </Link>
-
-          <Link href='/game/levels' className='flex-1'>
-            <div className='flex flex-col items-center py-3 text-blue-600'>
-              <PuzzlePieceIcon className='w-6 h-6' />
-              <span className='text-xs mt-1'>Levels</span>
-            </div>
-          </Link>
-
-          <Link href='/leaderboard' className='flex-1'>
-            <div className='flex flex-col items-center py-3 text-purple-600 border-t-2 border-purple-600'>
-              <TrophyIcon className='w-6 h-6' />
-              <span className='text-xs mt-1'>Leaderboard</span>
-            </div>
-          </Link>
-
-          <Link href='/profile' className='flex-1'>
-            <div className='flex flex-col items-center py-3 text-blue-600'>
-              <UserIcon className='w-6 h-6' />
-              <span className='text-xs mt-1'>Profile</span>
-            </div>
-          </Link>
-        </div>
-      </div>
+      <BottomNav activeTab="leaderboard" />
 
 
     </div>

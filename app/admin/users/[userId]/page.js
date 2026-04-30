@@ -1,10 +1,25 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import AdminGuard from '../../../../components/AdminGuard';
+import {
+  AdminBadge,
+  AdminEmpty,
+  AdminError,
+  AdminLoading,
+  AdminPanel,
+  AdminShell,
+  AdminStatCard,
+} from '../../../../components/admin/AdminLayout';
 import { adminFetch } from '../../../../lib/adminFetch';
+import {
+  ChatBubbleLeftRightIcon,
+  ClipboardDocumentCheckIcon,
+  EnvelopeIcon,
+  TrophyIcon,
+} from '@heroicons/react/24/outline';
 
 const LEVEL_NAMES = {
   1: 'Cyber Security Basics',
@@ -15,6 +30,12 @@ const LEVEL_NAMES = {
   6: 'Malware Defense',
 };
 
+function formatDate(value) {
+  if (!value) return 'Unknown';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 'Unknown' : date.toLocaleString();
+}
+
 function UserDetailContent() {
   const { userId } = useParams();
   const [data, setData] = useState(null);
@@ -24,132 +45,159 @@ function UserDetailContent() {
 
   useEffect(() => {
     adminFetch(`/api/admin/users/${userId}`)
-      .then(setData)
+      .then((payload) => {
+        setData(payload);
+        setError(null);
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [userId]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50">
-        <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
-      </div>
+      <AdminShell title="User Detail" description="Inspect player progress, submitted feedback, and chat history.">
+        <AdminLoading label="Loading user detail..." />
+      </AdminShell>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50">
-        <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-red-700 max-w-md">{error}</div>
-      </div>
+      <AdminShell title="User Detail" description="Inspect player progress, submitted feedback, and chat history.">
+        <AdminError message={error} />
+      </AdminShell>
     );
   }
 
   const { user, levelProgress, unlockedLevels, feedback, chatSessions } = data;
+  const completedLevels = levelProgress.filter((progress) => progress.completed).length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
-      <header className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-800">User Detail</h1>
-          <Link href="/admin/users" className="text-sm text-purple-600 hover:text-purple-800 font-medium">
-            ← All Users
-          </Link>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        {/* Profile Card */}
-        <div className="bg-white rounded-2xl shadow-md p-6 flex items-center gap-6">
-          <span className="text-5xl">{user.avatar_emoji || '👤'}</span>
-          <div>
-            <h2 className="text-2xl font-bold text-gray-800">{user.username}</h2>
-            <p className="text-gray-500">{user.email}</p>
-            <div className="flex gap-4 mt-2 text-sm">
-              <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full font-medium">
-                Score: {user.score || 0}
-              </span>
-              <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full font-medium">
-                Unlocked: {unlockedLevels.length}/6
-              </span>
+    <AdminShell
+      title={user.username}
+      description={`Player ID ${user.id}. Account created ${formatDate(user.createdAt)}.`}
+      actions={
+        <Link
+          href="/admin/users"
+          className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
+        >
+          All users
+        </Link>
+      }
+    >
+      <div className="space-y-6">
+        <AdminPanel>
+          <div className="flex flex-wrap items-center gap-5 p-5">
+            <span className="grid h-16 w-16 place-items-center rounded-lg bg-slate-100 text-4xl">
+              {user.avatarEmoji || '👤'}
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-xl font-semibold text-slate-950">{user.username}</h2>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <AdminBadge tone="blue">Score: {user.score || 0}</AdminBadge>
+                <AdminBadge tone="green">Completed: {completedLevels}/6</AdminBadge>
+                <AdminBadge tone="slate">Unlocked: {unlockedLevels.length}/6</AdminBadge>
+              </div>
             </div>
           </div>
+        </AdminPanel>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <AdminStatCard label="Score" value={user.score || 0} icon={TrophyIcon} tone="amber" />
+          <AdminStatCard label="Completed Levels" value={`${completedLevels}/6`} icon={ClipboardDocumentCheckIcon} tone="green" />
+          <AdminStatCard label="Feedback" value={feedback.length} icon={EnvelopeIcon} tone="blue" />
+          <AdminStatCard label="Chat Sessions" value={chatSessions.length} icon={ChatBubbleLeftRightIcon} tone="slate" />
         </div>
 
-        {/* Level Progress */}
-        <div className="bg-white rounded-2xl shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Level Progress</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3, 4, 5, 6].map((lid) => {
-              const prog = levelProgress.find((p) => (p.levelId || p.level_id) === lid);
-              const unlocked = unlockedLevels.includes(lid);
-              const passed = prog?.passed || prog?.completed;
+        <AdminPanel title="Level Progress" description="Current progress for each learning level.">
+          <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3, 4, 5, 6].map((levelId) => {
+              const progress = levelProgress.find((item) => (item.levelId || item.level_id) === levelId);
+              const unlocked = unlockedLevels.includes(levelId);
+              const completed = progress?.passed || progress?.completed;
+              const tone = completed ? 'green' : unlocked ? 'blue' : 'slate';
+
               return (
-                <div key={lid} className={`border rounded-xl p-4 ${passed ? 'border-green-300 bg-green-50' : unlocked ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-gray-50'}`}>
-                  <p className="font-medium text-gray-800">Level {lid}: {LEVEL_NAMES[lid]}</p>
-                  {prog ? (
-                    <div className="mt-2 text-sm space-y-1">
-                      <p>Score: <span className="font-semibold">{prog.score}</span></p>
-                      <p>Status: {passed ? <span className="text-green-600 font-medium">Completed ✓</span> : <span className="text-yellow-600 font-medium">In Progress</span>}</p>
+                <div key={levelId} className="rounded-lg border border-slate-200 bg-white p-4">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-950">Level {levelId}</p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">{LEVEL_NAMES[levelId]}</p>
+                    </div>
+                    <AdminBadge tone={tone}>{completed ? 'Completed' : unlocked ? 'Unlocked' : 'Locked'}</AdminBadge>
+                  </div>
+                  {progress ? (
+                    <div className="space-y-1 text-sm text-slate-600">
+                      <p>Score: <span className="font-semibold text-slate-950">{progress.score}</span></p>
+                      <p>Last played: {formatDate(progress.lastPlayedAt)}</p>
                     </div>
                   ) : (
-                    <p className="mt-2 text-sm text-gray-500">{unlocked ? 'Not attempted' : 'Locked'}</p>
+                    <p className="text-sm text-slate-500">{unlocked ? 'Not attempted' : 'Unavailable until prior levels are completed'}</p>
                   )}
                 </div>
               );
             })}
           </div>
-        </div>
+        </AdminPanel>
 
-        {/* Feedback */}
-        <div className="bg-white rounded-2xl shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Feedback ({feedback.length})</h3>
+        <AdminPanel title={`Feedback (${feedback.length})`} description="Messages submitted by this player.">
           {feedback.length === 0 ? (
-            <p className="text-gray-500">No feedback submitted</p>
+            <div className="p-5">
+              <AdminEmpty title="No feedback submitted" />
+            </div>
           ) : (
-            <div className="space-y-3">
-              {feedback.map((f) => (
-                <div key={f.id} className="border rounded-xl p-4">
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                      f.feedbackType === 'bug' ? 'bg-red-100 text-red-700' : f.feedbackType === 'feature' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
-                    }`}>{f.feedbackType}</span>
-                    <span className="text-yellow-400 text-sm">{'⭐'.repeat(f.rating || 0)}</span>
-                    <span className={`ml-auto text-xs px-2 py-0.5 rounded ${f.resolved ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                      {f.resolved ? 'Resolved' : 'Open'}
-                    </span>
+            <div className="divide-y divide-slate-100">
+              {feedback.map((item) => (
+                <div key={item.id} className="px-5 py-4">
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <AdminBadge tone={item.feedbackType === 'bug' ? 'red' : item.feedbackType === 'feature' ? 'green' : 'blue'}>
+                      {item.feedbackType}
+                    </AdminBadge>
+                    <span className="text-sm text-amber-500">{'★'.repeat(item.rating || 0)}</span>
+                    <AdminBadge tone={item.resolved ? 'green' : 'amber'}>{item.resolved ? 'Resolved' : 'Open'}</AdminBadge>
                   </div>
-                  <p className="text-gray-700 text-sm">{f.message}</p>
+                  <p className="text-sm leading-6 text-slate-700">{item.message}</p>
                 </div>
               ))}
             </div>
           )}
-        </div>
+        </AdminPanel>
 
-        {/* Chat Sessions */}
-        <div className="bg-white rounded-2xl shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Chat Sessions ({chatSessions.length})</h3>
+        <AdminPanel title={`Chat Sessions (${chatSessions.length})`} description="Stored chatbot conversations for this player.">
           {chatSessions.length === 0 ? (
-            <p className="text-gray-500">No chat history</p>
+            <div className="p-5">
+              <AdminEmpty title="No chat history" />
+            </div>
           ) : (
-            <div className="space-y-3">
-              {chatSessions.map((s) => (
-                <div key={s.sessionId} className="border rounded-xl overflow-hidden">
+            <div className="divide-y divide-slate-100">
+              {chatSessions.map((session) => (
+                <div key={session.sessionId}>
                   <button
-                    onClick={() => setExpandedSession(expandedSession === s.sessionId ? null : s.sessionId)}
-                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+                    type="button"
+                    onClick={() => setExpandedSession(expandedSession === session.sessionId ? null : session.sessionId)}
+                    className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-slate-50"
                   >
-                    <span className="text-sm font-medium text-gray-700">
-                      Session: {s.sessionId.slice(0, 20)}...
+                    <span>
+                      <span className="block text-sm font-semibold text-slate-950">
+                        Session {session.sessionId.slice(0, 20)}
+                      </span>
+                      <span className="mt-1 block text-xs text-slate-500">{formatDate(session.lastMessageAt)}</span>
                     </span>
-                    <span className="text-sm text-gray-500">{s.messageCount} messages</span>
+                    <AdminBadge tone="slate">{session.messageCount} messages</AdminBadge>
                   </button>
-                  {expandedSession === s.sessionId && (
-                    <div className="border-t px-4 py-3 max-h-64 overflow-y-auto space-y-2 bg-gray-50">
-                      {s.messages.map((m) => (
-                        <div key={m.id} className={`text-sm p-2 rounded-lg ${m.role === 'user' ? 'bg-blue-100 text-blue-800 ml-8' : 'bg-white text-gray-700 mr-8 border'}`}>
-                          <span className="text-xs font-medium text-gray-500 block mb-1">{m.role}</span>
-                          {m.content}
+                  {expandedSession === session.sessionId && (
+                    <div className="space-y-3 border-t border-slate-200 bg-slate-50 px-5 py-4">
+                      {session.messages.map((message) => (
+                        <div
+                          key={message.id}
+                          className={`max-w-3xl rounded-lg border px-4 py-3 text-sm leading-6 ${
+                            message.role === 'user'
+                              ? 'ml-auto border-blue-200 bg-blue-50 text-blue-900'
+                              : 'border-slate-200 bg-white text-slate-700'
+                          }`}
+                        >
+                          <span className="mb-1 block text-xs font-semibold uppercase text-slate-500">{message.role}</span>
+                          <p className="whitespace-pre-wrap">{message.content}</p>
                         </div>
                       ))}
                     </div>
@@ -158,9 +206,9 @@ function UserDetailContent() {
               ))}
             </div>
           )}
-        </div>
-      </main>
-    </div>
+        </AdminPanel>
+      </div>
+    </AdminShell>
   );
 }
 

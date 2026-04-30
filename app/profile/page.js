@@ -27,14 +27,8 @@ import EnhancedButton from '../../components/EnhancedButton';
 import { CircularProgress, AnimatedProgressBar } from '../../components/ProgressIndicators';
 import { AchievementsList } from '../../components/AchievementNotification';
 import { getAchievementProgress, DEFAULT_USER_STATS } from '../../utils/achievements';
-import { db } from '../../lib/firebase';
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-} from 'firebase/firestore';
 import { extractProfileContext } from '../../utils/chatbotContext';
+import BottomNav from '../../components/BottomNav';
 
 const avatarEmojis = [
   '👧',
@@ -78,7 +72,7 @@ function ProfilePage() {
       setUsername(userProfile.username || '');
       setSelectedAvatar(userProfile.avatar_emoji || '👤');
       
-      // Load actual user stats from Firebase instead of estimating
+      // Load actual user stats from Postgres API instead of estimating
       loadActualUserStats();
     }
   }, [userProfile]);
@@ -87,54 +81,27 @@ function ProfilePage() {
     if (!user?.id) return;
 
     try {
-      // Get actual progress from Firebase
-      const progressRef = collection(db, 'progress');
-      const q = query(progressRef, where('userId', '==', user.id));
-      const querySnapshot = await getDocs(q);
-
-      let completedLevels = 0;
-      let totalCorrectAnswers = 0;
-      let totalAnswers = 0;
-      let perfectScores = 0;
-
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        if (data.passed) {
-          completedLevels++;
-        }
-        // Estimate questions based on score (each correct answer = 100 points)
-        const questionsCorrect = Math.floor((data.score || 0) / 100);
-        totalCorrectAnswers += questionsCorrect;
-        totalAnswers += questionsCorrect + 1; // Add some wrong answers
-        
-        // Perfect score if score equals max possible for level
-        if (data.score >= 500) { // Assuming 5 questions per level * 100 points
-          perfectScores++;
-        }
-      });
+      // Load progress from API
+      const res = await fetch('/api/progress');
+      const data = await res.json();
+      const progress = data.progress || [];
+      const completedLevels = progress.filter(p => p.completed).length;
 
       const calculatedStats = {
         ...DEFAULT_USER_STATS,
         levelsCompleted: completedLevels,
-        correctAnswers: totalCorrectAnswers,
-        totalAnswers: Math.max(totalAnswers, totalCorrectAnswers), // Ensure total >= correct
-        perfectScores: perfectScores,
       };
-      
-      console.log('Loaded actual user stats:', calculatedStats);
+
       setUserStats(calculatedStats);
-      
-      // Get achievement progress
-      const achievementProgress = getAchievementProgress(calculatedStats, []);
+
+      // Load achievements from localStorage
+      const storedAchievements = localStorage.getItem(`achievements_${user.id}`);
+      const earnedAchievements = storedAchievements ? JSON.parse(storedAchievements) : [];
+      const achievementProgress = getAchievementProgress(calculatedStats, earnedAchievements);
       setAchievements(achievementProgress);
     } catch (error) {
       console.error('Error loading user stats:', error);
-      // Fallback to basic stats
-      const basicStats = {
-        ...DEFAULT_USER_STATS,
-        levelsCompleted: 0,
-      };
-      setUserStats(basicStats);
+      setUserStats({ ...DEFAULT_USER_STATS });
     }
   };
 
@@ -205,11 +172,19 @@ function ProfilePage() {
       }
 
       // Handle ISO strings or other date formats
-      return new Date(dateValue).toLocaleDateString();
+      if (dateValue) {
+        return new Date(dateValue).toLocaleDateString();
+      }
+      return 'Recently joined';
     } catch (error) {
       console.error('Error formatting date:', error);
       return 'Recently joined';
     }
+  };
+
+  // Get the join date from userProfile - check both camelCase and snake_case
+  const getJoinDate = () => {
+    return userProfile?.created_at || userProfile?.createdAt;
   };
 
   if (!user || !userProfile) {
@@ -278,7 +253,7 @@ function ProfilePage() {
                 <h2 className='text-xl font-bold text-purple-700'>
                   {username}
                 </h2>
-                <p className='text-sm text-blue-600'>{user.email}</p>
+                <p className='text-sm text-blue-600'>Joined CagE</p>
               </div>
             </div>
             {!isEditing ? (
@@ -323,8 +298,8 @@ function ProfilePage() {
                 <span className='text-sm'>Joined</span>
               </div>
               <p className='text-sm text-purple-700'>
-                {userProfile.created_at
-                  ? formatJoinedDate(userProfile.created_at)
+                {getJoinDate()
+                  ? formatJoinedDate(getJoinDate())
                   : 'Recently joined'}
               </p>
             </div>
@@ -537,37 +512,7 @@ function ProfilePage() {
       </div>
 
       {/* Bottom navigation */}
-      <div className='fixed bottom-0 left-0 right-0 bg-white shadow-lg z-30'>
-        <div className='flex justify-around items-center'>
-          <Link href='/game/levels' className='flex-1'>
-            <div className='flex flex-col items-center py-3 text-blue-600'>
-              <HomeIcon className='w-6 h-6' />
-              <span className='text-xs mt-1'>Home</span>
-            </div>
-          </Link>
-
-          <Link href='/game/levels' className='flex-1'>
-            <div className='flex flex-col items-center py-3 text-blue-600'>
-              <PuzzlePieceIcon className='w-6 h-6' />
-              <span className='text-xs mt-1'>Levels</span>
-            </div>
-          </Link>
-
-          <Link href='/leaderboard' className='flex-1'>
-            <div className='flex flex-col items-center py-3 text-blue-600'>
-              <TrophyIcon className='w-6 h-6' />
-              <span className='text-xs mt-1'>Leaderboard</span>
-            </div>
-          </Link>
-
-          <Link href='/profile' className='flex-1'>
-            <div className='flex flex-col items-center py-3 text-purple-600 border-t-2 border-purple-600'>
-              <UserIcon className='w-6 h-6' />
-              <span className='text-xs mt-1'>Profile</span>
-            </div>
-          </Link>
-        </div>
-      </div>
+      <BottomNav activeTab="profile" />
 
       {/* Feedback Button */}
       <FeedbackButton />
