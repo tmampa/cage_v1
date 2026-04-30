@@ -6,7 +6,7 @@ const pendingRequests = {};
 
 // Client-side cache
 const questionCache = new Map();
-const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+const CACHE_DURATION = Infinity; // Cache indefinitely to prevent repeated API calls
 
 // Level definitions (kept client-side for UI display purposes)
 const levelDefinitions = [

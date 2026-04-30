@@ -1,0 +1,72 @@
+{
+  "1": {
+    "questions": [
+      {
+        "question": "What is the primary goal of cyber security?",
+        "options": [
+          "To protect systems, networks, and data from digital attacks",
+          "To make sure everyone has the fastest internet speed possible",
+          "To help people find information faster on search engines",
+          "To fix broken hardware like computer screens and keyboards"
+        ],
+        "correctIndex": 0,
+        "explanation": "Cyber security is the practice of protecting our digital lives—including our personal information, computers, and networks—from being stolen, damaged, or accessed by unauthorized people.",
+        "hint": "Think about why we put locks on our front doors, but apply that to a computer.",
+        "levelId": 1
+      },
+      {
+        "question": "You receive an email from a person you don't know asking for your home address to send you a 'free prize.' What is the safest action to take?",
+        "options": [
+          "Forward the email to all your friends so they can win too",
+          "Delete the email and do not share any personal information",
+          "Send them your address so you don't miss out on the prize",
+          "Reply and ask for more details about their company first"
+        ],
+        "correctIndex": 1,
+        "explanation": "Sharing personal information like your home address with strangers online is a major privacy risk. Scammers often use 'free prizes' as bait to collect data for identity theft.",
+        "hint": "If something sounds too good to be true from a stranger, it usually is.",
+        "levelId": 1
+      },
+      {
+        "question": "Which of the following best describes your 'digital footprint'?",
+        "options": [
+          "The amount of electricity used by your electronic devices",
+          "The record of everything you do, post, or leave behind online",
+          "The physical size of your computer or smartphone",
+          "A special password used to unlock a digital device"
+        ],
+        "correctIndex": 1,
+        "explanation": "Your digital footprint is the trail of data you leave behind on the internet. This includes social media posts, comments, and websites you visit. It can be permanent and seen by others.",
+        "hint": "Think about the trail of tracks you leave behind when walking on a beach.",
+        "levelId": 1
+      },
+      {
+        "question": "While browsing a website, a pop-up appears saying your computer is infected with viruses and tells you to 'Click here to clean.' What is this most likely?",
+        "options": [
+          "An automatic update for your internet browser",
+          "A helpful warning from your computer's manufacturer",
+          "A sign that you need to buy a new computer immediately",
+          "A common online threat designed to trick you into clicking a bad link"
+        ],
+        "correctIndex": 3,
+        "explanation": "Scary pop-ups are often 'scareware'—a type of threat designed to trick you into downloading real viruses or giving away information. Legitimate security software does not use random web pop-ups to warn you.",
+        "hint": "Real security programs don't usually use bright, flashing advertisements to help you.",
+        "levelId": 1
+      },
+      {
+        "question": "What does it mean to be a good 'digital citizen'?",
+        "options": [
+          "Knowing how to bypass security to see other people's accounts",
+          "Spending at least 10 hours a day using digital devices",
+          "Having the highest number of followers on a social media platform",
+          "Using technology and the internet in a responsible and respectful way"
+        ],
+        "correctIndex": 3,
+        "explanation": "Digital citizenship is about being safe, respectful, and responsible online. This includes protecting your own privacy and treating others with kindness in digital spaces.",
+        "hint": "It is very similar to being a good neighbor or student, but in the virtual world.",
+        "levelId": 1
+      }
+    ],
+    "timestamp": 1777531887132
+  }
+}
