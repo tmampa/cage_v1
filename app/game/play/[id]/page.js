@@ -93,6 +93,12 @@ export default function GameplayPage({ params }) {
   const userStatsRef = React.useRef(userStats);
   React.useEffect(() => { userStatsRef.current = userStats; }, [userStats]);
 
+  useEffect(() => {
+    if (user?.isAdmin) {
+      router.replace('/admin');
+    }
+  }, [user?.isAdmin, router]);
+
   // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -120,6 +126,11 @@ export default function GameplayPage({ params }) {
   useEffect(() => {
     const loadLevelAndQuestions = async () => {
       try {
+        if (user?.isAdmin) {
+          setLoading(false);
+          return;
+        }
+
         setLoading(true);
         setError(null);
 
@@ -211,7 +222,7 @@ export default function GameplayPage({ params }) {
     return () => {
       clearTimeout(timerRef.current);
     };
-  }, [levelId, user?.id]);
+  }, [levelId, user?.id, user?.isAdmin]);
 
   // Handle level complete
   const completedLevel = async () => {
@@ -556,7 +567,7 @@ export default function GameplayPage({ params }) {
             No Questions Available
           </h2>
           <p className='text-blue-700 mb-6'>
-            We couldn't generate questions for this level. Fallback questions have been removed from the system.
+            We couldn&apos;t generate questions for this level. Fallback questions have been removed from the system.
           </p>
           <Link href='/game/levels'>
             <button className='btn-primary'>Back to Levels</button>
@@ -598,7 +609,7 @@ export default function GameplayPage({ params }) {
             </div>
 
             <p className='mb-6 text-blue-700'>
-              Don't worry! Learning about cyber security takes practice. Try
+              Don&apos;t worry! Learning about cyber security takes practice. Try
               again!
             </p>
 

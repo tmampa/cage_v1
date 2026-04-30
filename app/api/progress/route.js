@@ -14,6 +14,7 @@ export async function GET() {
 
     const payload = await verifyJWT(token);
     if (!payload) return NextResponse.json({ progress: [] });
+    if (payload.isAdmin) return NextResponse.json({ progress: [] });
 
     const userId = Number(payload.sub);
 
@@ -38,6 +39,9 @@ export async function POST(request) {
 
     const payload = await verifyJWT(token);
     if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (payload.isAdmin) {
+      return NextResponse.json({ success: true, totalScore: 0, skipped: true });
+    }
 
     const userId = Number(payload.sub);
     const { levelId, score, completed } = await request.json();

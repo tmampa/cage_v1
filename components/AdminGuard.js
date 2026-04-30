@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
-import { isAdminEmail } from '../lib/adminAuth';
 
 /**
  * Wraps admin-only pages. Redirects non-admins to home.
@@ -11,7 +10,7 @@ import { isAdminEmail } from '../lib/adminAuth';
 export default function AdminGuard({ children }) {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [authorized, setAuthorized] = useState(false);
+  const authorized = Boolean(user?.isAdmin);
 
   useEffect(() => {
     if (loading) return;
@@ -21,12 +20,9 @@ export default function AdminGuard({ children }) {
       return;
     }
 
-    if (!isAdminEmail(user.email)) {
+    if (!user.isAdmin) {
       router.replace('/');
-      return;
     }
-
-    setAuthorized(true);
   }, [user, loading, router]);
 
   if (loading || !authorized) {

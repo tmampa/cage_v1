@@ -30,8 +30,8 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await login(username.trim(), password);
-      router.push('/game/levels');
+      const user = await login(username.trim(), password);
+      router.push(user?.isAdmin ? '/admin' : '/game/levels');
     } catch (err) {
       setError(err.message || 'Invalid username or password.');
     } finally {

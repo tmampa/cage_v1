@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ArrowLeftIcon,
   TrophyIcon,
@@ -27,6 +28,7 @@ import BottomNav from '../../../components/BottomNav';
 
 export default function LevelsPage() {
   const { user, userProfile } = useAuth();
+  const router = useRouter();
 
   // State for levels and user progress
   const [levels, setLevels] = useState([
@@ -126,10 +128,16 @@ export default function LevelsPage() {
     sort: 'order'
   });
 
+  useEffect(() => {
+    if (user?.isAdmin) {
+      router.replace('/admin');
+    }
+  }, [user?.isAdmin, router]);
+
   // Load user progress from API
   useEffect(() => {
     const loadUserProgress = async () => {
-      if (!user?.id) return;
+      if (!user?.id || user.isAdmin) return;
 
       try {
         const res = await fetch('/api/progress');
@@ -178,7 +186,7 @@ export default function LevelsPage() {
     };
 
     loadUserProgress();
-  }, [user?.id]);
+  }, [user?.id, user?.isAdmin]);
 
 
   // Filter and sort levels based on current filters

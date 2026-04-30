@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '../../../../lib/db.js';
 import { users, levelProgress, feedback } from '../../../../db/schema.js';
 import { verifyAdmin } from '../../../../lib/verifyAdmin.js';
-import { desc, gte, sql } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 
 export async function GET(request) {
   try {
@@ -13,7 +13,7 @@ export async function GET(request) {
       id:        users.id,
       score:     users.score,
       createdAt: users.createdAt,
-    }).from(users);
+    }).from(users).where(eq(users.isAdmin, false));
 
     const totalUsers = allUsers.length;
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -34,7 +34,10 @@ export async function GET(request) {
     });
 
     // ---- Level progress stats ----
-    const allProgress = await db.select().from(levelProgress);
+    const playerIds = allUsers.map(u => u.id);
+    const allProgress = playerIds.length > 0
+      ? await db.select().from(levelProgress).where(inArray(levelProgress.userId, playerIds))
+      : [];
 
     const levelStats = {};
     allProgress.forEach(p => {

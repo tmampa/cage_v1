@@ -41,8 +41,8 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      await register(username.trim(), password);
-      router.push('/game/levels');
+      const user = await register(username.trim(), password);
+      router.push(user?.isAdmin ? '/admin' : '/game/levels');
     } catch (err) {
       setError(err.message || 'Registration failed. Please try again.');
     } finally {

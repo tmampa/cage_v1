@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '../../../../lib/db.js';
 import { users, levelProgress } from '../../../../db/schema.js';
 import { verifyAdmin } from '../../../../lib/verifyAdmin.js';
-import { eq, desc, asc, ilike, sql } from 'drizzle-orm';
+import { and, desc, asc, eq, ilike, inArray } from 'drizzle-orm';
 
 export async function GET(request) {
   try {
@@ -18,7 +18,12 @@ export async function GET(request) {
     const sortColumn = sortBy === 'username' ? users.username : users.score;
     const orderFn = order === 'asc' ? asc : desc;
 
-    let rows = await db
+    const filters = [eq(users.isAdmin, false)];
+    if (search) {
+      filters.push(ilike(users.username, `%${search}%`));
+    }
+
+    const rows = await db
       .select({
         id:          users.id,
         username:    users.username,
@@ -28,16 +33,15 @@ export async function GET(request) {
         createdAt:   users.createdAt,
       })
       .from(users)
+      .where(and(...filters))
       .orderBy(orderFn(sortColumn))
       .limit(limitNum);
 
-    // Client-side search filter
-    if (search) {
-      rows = rows.filter(u => u.username.toLowerCase().includes(search));
-    }
-
     // Enrich with level progress counts
-    const progressRows = await db.select().from(levelProgress);
+    const userIds = rows.map(u => u.id);
+    const progressRows = userIds.length > 0
+      ? await db.select().from(levelProgress).where(inArray(levelProgress.userId, userIds))
+      : [];
     const enriched = rows.map(u => {
       const prog = progressRows.filter(p => p.userId === u.id);
       const completed = prog.filter(p => p.completed).length;

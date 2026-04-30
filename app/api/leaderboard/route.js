@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '../../../lib/db.js';
 import { users } from '../../../db/schema.js';
-import { desc, gte } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 
 export async function GET(request) {
   try {
@@ -17,6 +17,7 @@ export async function GET(request) {
         createdAt:   users.createdAt,
       })
       .from(users)
+      .where(eq(users.isAdmin, false))
       .orderBy(desc(users.score))
       .limit(50);
 

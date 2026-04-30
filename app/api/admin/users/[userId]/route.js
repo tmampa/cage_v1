@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '../../../../../lib/db.js';
 import { users, levelProgress, feedback } from '../../../../../db/schema.js';
 import { verifyAdmin } from '../../../../../lib/verifyAdmin.js';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 export async function GET(request, { params }) {
   try {
@@ -22,7 +22,7 @@ export async function GET(request, { params }) {
         createdAt:   users.createdAt,
       })
       .from(users)
-      .where(eq(users.id, uid))
+      .where(and(eq(users.id, uid), eq(users.isAdmin, false)))
       .limit(1);
 
     if (!user) {
