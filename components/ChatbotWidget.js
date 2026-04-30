@@ -124,8 +124,8 @@ export default function ChatbotWidget() {
     }
   }, [isDragging, dragOffset, currentPosition]);
 
-  // Hide chatbot on profile page (must be after all hooks)
-  if (pathname === '/profile') {
+  // Hide chatbot on profile and admin pages (must be after all hooks)
+  if (pathname === '/profile' || pathname.startsWith('/admin')) {
     return null;
   }
 
