@@ -80,7 +80,7 @@ export async function initializeUserProgress() {
  * Fetch leaderboard data from the API.
  * @param {string} timeFilter — 'all' | 'week' | 'month'
  */
-export async function getFirebaseLeaderboardData(timeFilter = 'all') {
+export async function getLeaderboardData(timeFilter = 'all') {
   const res = await fetch(`/api/leaderboard?filter=${timeFilter}`);
   const data = await res.json();
   return data.leaderboard || [];
