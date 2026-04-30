@@ -1,5 +1,10 @@
 import { GoogleGenAI } from '@google/genai';
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { eq } from 'drizzle-orm';
+import { db } from '../../../lib/db.js';
+import { COOKIE_NAME, verifyJWT } from '../../../lib/auth.js';
+import { chatMessages, users } from '../../../db/schema.js';
 import { checkRateLimit, RATE_LIMIT_CONFIG } from '@/utils/rateLimiter';
 
 // Initialize Gemini AI with server-only API key
@@ -24,11 +29,58 @@ function validateRequest(body) {
   if (body.conversationHistory && !Array.isArray(body.conversationHistory)) {
     errors.push('Conversation history must be an array');
   }
+
+  if (body.sessionId && typeof body.sessionId !== 'string') {
+    errors.push('Session ID must be a string');
+  }
   
   return {
     isValid: errors.length === 0,
     errors
   };
+}
+
+function normalizeSessionId(sessionId) {
+  if (typeof sessionId === 'string' && /^[a-zA-Z0-9_-]{8,80}$/.test(sessionId)) {
+    return sessionId;
+  }
+
+  return `server-${Date.now()}`;
+}
+
+async function getAuthenticatedChatUser() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(COOKIE_NAME)?.value;
+  if (!token) return null;
+
+  const payload = await verifyJWT(token);
+  if (!payload) return null;
+
+  const [user] = await db
+    .select({
+      id:      users.id,
+      isAdmin: users.isAdmin,
+    })
+    .from(users)
+    .where(eq(users.id, Number(payload.sub)))
+    .limit(1);
+
+  return user || null;
+}
+
+async function saveChatMessage({ chatUser, sessionId, role, content }) {
+  if (!chatUser || chatUser.isAdmin) return;
+
+  try {
+    await db.insert(chatMessages).values({
+      userId: chatUser.id,
+      sessionId,
+      role,
+      content,
+    });
+  } catch (error) {
+    console.error('[Chat API] Failed to save chat message:', error);
+  }
 }
 
 
@@ -73,6 +125,15 @@ export async function POST(request) {
         { status: 400 }
       );
     }
+
+    const sessionId = normalizeSessionId(body.sessionId);
+    const chatUser = await getAuthenticatedChatUser();
+    await saveChatMessage({
+      chatUser,
+      sessionId,
+      role: 'user',
+      content: body.message.trim(),
+    });
     
     // Check API key configuration
     if (!process.env.GEMINI_API_KEY) {
@@ -134,6 +195,12 @@ Guidelines:
     
     const result = await Promise.race([responsePromise, timeoutPromise]);
     const text = result.text;
+    await saveChatMessage({
+      chatUser,
+      sessionId,
+      role: 'assistant',
+      content: text,
+    });
     
     // Log successful request (for monitoring)
     console.log(`[Chat API] Success - IP: ${ip}, Response length: ${text.length}`);

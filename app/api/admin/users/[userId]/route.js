@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '../../../../../lib/db.js';
 import { users, levelProgress, feedback } from '../../../../../db/schema.js';
 import { verifyAdmin } from '../../../../../lib/verifyAdmin.js';
+import { getChatSessionsForUser } from '../../../../../lib/chatHistory.js';
 import { and, eq } from 'drizzle-orm';
 
 export async function GET(request, { params }) {
@@ -45,13 +46,14 @@ export async function GET(request, { params }) {
       .select()
       .from(feedback)
       .where(eq(feedback.userId, uid));
+    const chatSessions = await getChatSessionsForUser(uid);
 
     return NextResponse.json({
       user,
       levelProgress: levelProgressRows,
       unlockedLevels,
       feedback: userFeedback,
-      chatSessions: [], // chat is sessionStorage-only now
+      chatSessions,
     });
   } catch (error) {
     const status = error.message.includes('Forbidden') ? 403 : error.message.includes('Missing') ? 401 : 500;

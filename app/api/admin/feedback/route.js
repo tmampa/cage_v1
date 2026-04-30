@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '../../../../lib/db.js';
-import { feedback } from '../../../../db/schema.js';
+import { feedback, users } from '../../../../db/schema.js';
 import { verifyAdmin } from '../../../../lib/verifyAdmin.js';
 import { eq, desc } from 'drizzle-orm';
 
@@ -14,8 +14,19 @@ export async function GET(request) {
     const filterStatus = searchParams.get('status') || 'all';
 
     let rows = await db
-      .select()
+      .select({
+        id:           feedback.id,
+        userId:       feedback.userId,
+        username:     feedback.username,
+        feedbackType: feedback.feedbackType,
+        rating:       feedback.rating,
+        message:      feedback.message,
+        resolved:     feedback.resolved,
+        createdAt:    feedback.createdAt,
+        userScore:    users.score,
+      })
       .from(feedback)
+      .leftJoin(users, eq(feedback.userId, users.id))
       .orderBy(desc(feedback.createdAt))
       .limit(limitNum);
 

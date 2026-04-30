@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { db } from '../../../../lib/db.js';
-import { feedback } from '../../../../db/schema.js';
-import { verifyJWT, COOKIE_NAME } from '../../../../lib/auth.js';
+import { db } from '../../../lib/db.js';
+import { feedback } from '../../../db/schema.js';
+import { verifyJWT, COOKIE_NAME } from '../../../lib/auth.js';
 
 export async function POST(request) {
   try {

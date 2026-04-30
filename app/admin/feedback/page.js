@@ -13,17 +13,37 @@ function FeedbackContent() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [expandedId, setExpandedId] = useState(null);
 
-  const fetchFeedback = () => {
-    setLoading(true);
+  useEffect(() => {
+    let cancelled = false;
+
     adminFetch(`/api/admin/feedback?type=${filterType}&status=${filterStatus}`)
-      .then((data) => setFeedback(data.feedback || []))
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+      .then((data) => {
+        if (!cancelled) {
+          setFeedback(data.feedback || []);
+          setError(null);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [filterType, filterStatus]);
+
+  const handleTypeChange = (value) => {
+    setLoading(true);
+    setFilterType(value);
   };
 
-  useEffect(() => {
-    fetchFeedback();
-  }, [filterType, filterStatus]);
+  const handleStatusChange = (value) => {
+    setLoading(true);
+    setFilterStatus(value);
+  };
 
   const toggleResolved = async (id, currentResolved) => {
     try {
@@ -48,6 +68,16 @@ function FeedbackContent() {
     return styles[type] || styles.general;
   };
 
+  const formatSubmittedAt = (createdAt) => {
+    if (!createdAt) return 'Unknown';
+
+    const timestamp = createdAt?._seconds
+      ? new Date(createdAt._seconds * 1000)
+      : new Date(createdAt);
+
+    return Number.isNaN(timestamp.getTime()) ? 'Unknown' : timestamp.toLocaleString();
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
       <header className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-30">
@@ -69,7 +99,7 @@ function FeedbackContent() {
             <label className="text-xs font-semibold text-gray-500 uppercase block mb-1">Type</label>
             <select
               value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
+              onChange={(e) => handleTypeChange(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-purple-500 focus:outline-none text-sm"
             >
               <option value="all">All Types</option>
@@ -82,7 +112,7 @@ function FeedbackContent() {
             <label className="text-xs font-semibold text-gray-500 uppercase block mb-1">Status</label>
             <select
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
+              onChange={(e) => handleStatusChange(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-purple-500 focus:outline-none text-sm"
             >
               <option value="all">All</option>
@@ -132,14 +162,11 @@ function FeedbackContent() {
                   <div className="border-t px-6 py-4 bg-gray-50 space-y-3">
                     <p className="text-gray-700">{f.message}</p>
                     <div className="flex flex-wrap gap-4 text-sm text-gray-500">
-                      <span>Email: {f.email}</span>
-                      <span>User Score: {f.userScoreAtTime}</span>
-                      <span>
-                        Submitted:{' '}
-                        {f.createdAt?._seconds
-                          ? new Date(f.createdAt._seconds * 1000).toLocaleString()
-                          : 'Unknown'}
-                      </span>
+                      <span>User: {f.username || 'Anonymous'}</span>
+                      {f.userScore !== null && f.userScore !== undefined && (
+                        <span>User Score: {f.userScore}</span>
+                      )}
+                      <span>Submitted: {formatSubmittedAt(f.createdAt)}</span>
                     </div>
                     <button
                       onClick={() => toggleResolved(f.id, f.resolved)}

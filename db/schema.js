@@ -40,3 +40,16 @@ export const feedback = pgTable('feedback', {
   resolved:    boolean('resolved').notNull().default(false),
   createdAt:   timestamp('created_at').notNull().defaultNow(),
 });
+
+/**
+ * Chat messages table — stores authenticated user chatbot conversations
+ * so admins can review support/learning history.
+ */
+export const chatMessages = pgTable('chat_messages', {
+  id:        serial('id').primaryKey(),
+  userId:    integer('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  sessionId: varchar('session_id', { length: 80 }).notNull(),
+  role:      varchar('role', { length: 20 }).notNull(),
+  content:   text('content').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});

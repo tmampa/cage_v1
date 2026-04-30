@@ -5,8 +5,8 @@ import { useAuth } from '../context/AuthContext';
 import { useChatbot } from '../context/ChatbotContext';
 
 /**
- * Syncs authenticated user ID into the ChatbotContext
- * so chat messages can be persisted to Firestore.
+ * Keeps the chatbot provider compatible with auth changes.
+ * Chat persistence now attaches users server-side from the session cookie.
  */
 export default function ChatUserSync() {
   const { user } = useAuth();
