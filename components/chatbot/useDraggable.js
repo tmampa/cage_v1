@@ -15,7 +15,9 @@ export function useDraggable({ initialPosition, onPositionChange, width = 380, h
   const [currentPosition, setCurrentPosition] = useState(initialPosition);
 
   // Sync external position changes back into local state (e.g. window resize).
+  // This is a legitimate sync from props → state for the drag offset.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentPosition(initialPosition);
   }, [initialPosition]);
 

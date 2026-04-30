@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LightBulbIcon, 
@@ -17,12 +17,14 @@ export default function HintSystem({
 }) {
   const [showHint, setShowHint] = useState(false);
   const [hintUsed, setHintUsed] = useState(false);
+  const prevQuestionRef = useRef(question?.question);
 
-  // Reset hint state when question changes
-  useEffect(() => {
-    setShowHint(false);
-    setHintUsed(false);
-  }, [question?.question]);
+  // Reset hint state when question changes (derived from props, no effect needed)
+  if (question?.question !== prevQuestionRef.current) {
+    prevQuestionRef.current = question?.question;
+    if (showHint) setShowHint(false);
+    if (hintUsed) setHintUsed(false);
+  }
 
   const handleUseHint = () => {
     if (disabled || hintsRemaining <= 0 || hintUsed) return;

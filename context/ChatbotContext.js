@@ -24,44 +24,52 @@ function createSessionId() {
 }
 
 export function ChatbotProvider({ children }) {
-  const [messages, setMessages] = useState([]);
-  const [sessionId, setSessionId] = useState(null);
-  const [isOpen, setIsOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [position, setPosition] = useState({ x: 20, y: 20 });
-  const [unreadCount, setUnreadCount] = useState(0);
-  // User identity is attached server-side from the auth cookie.
-  const setUserId = useCallback(() => {}, []);
-
-  useEffect(() => {
+  const [messages, setMessages] = useState(() => {
+    if (typeof window === 'undefined') return [];
     try {
       const savedHistory = sessionStorage.getItem(STORAGE_KEYS.CHAT_HISTORY);
       if (savedHistory) {
         const parsed = JSON.parse(savedHistory);
-        setMessages(parsed.messages || []);
+        return parsed.messages || [];
       }
-
-      let savedSessionId = sessionStorage.getItem(STORAGE_KEYS.CHAT_SESSION_ID);
-      if (!savedSessionId) {
-        savedSessionId = createSessionId();
-        sessionStorage.setItem(STORAGE_KEYS.CHAT_SESSION_ID, savedSessionId);
+    } catch { /* ignore */ }
+    return [];
+  });
+  const [sessionId, setSessionId] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      let saved = sessionStorage.getItem(STORAGE_KEYS.CHAT_SESSION_ID);
+      if (!saved) {
+        saved = createSessionId();
+        sessionStorage.setItem(STORAGE_KEYS.CHAT_SESSION_ID, saved);
       }
-      setSessionId(savedSessionId);
-
+      return saved;
+    } catch { /* ignore */ }
+    return null;
+  });
+  const [isOpen, setIsOpen] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
       const savedWidgetState = sessionStorage.getItem(STORAGE_KEYS.WIDGET_STATE);
       if (savedWidgetState) {
         const parsed = JSON.parse(savedWidgetState);
-        setIsOpen(parsed.isOpen || false);
+        return parsed.isOpen || false;
       }
-
+    } catch { /* ignore */ }
+    return false;
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [position, setPosition] = useState(() => {
+    if (typeof window === 'undefined') return { x: 20, y: 20 };
+    try {
       const savedPosition = localStorage.getItem(STORAGE_KEYS.WIDGET_POSITION);
-      if (savedPosition) {
-        setPosition(JSON.parse(savedPosition));
-      }
-    } catch (error) {
-      console.error('Error loading chatbot state from storage:', error);
-    }
-  }, []);
+      if (savedPosition) return JSON.parse(savedPosition);
+    } catch { /* ignore */ }
+    return { x: 20, y: 20 };
+  });
+  const [unreadCount, setUnreadCount] = useState(0);
+  // User identity is attached server-side from the auth cookie.
+  const setUserId = useCallback(() => {}, []);
 
   useEffect(() => {
     try {

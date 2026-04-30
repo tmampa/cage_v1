@@ -22,19 +22,8 @@ import { extractHomeContext } from "../utils/chatbotContext";
 export default function Home() {
   const { user, userProfile, signOut } = useAuth();
   
-  // Create decorative bubbles
-  const [bubbles, setBubbles] = useState([]);
-  
-  // Track actual level progress
-  const [levelProgress, setLevelProgress] = useState({
-    totalLevels: 6,
-    completedLevels: 0,
-    unlockedLevels: 1,
-    loading: true
-  });
-
-  useEffect(() => {
-    // Generate random bubbles
+  // Create decorative bubbles (generated once on mount via lazy initializer)
+  const [bubbles] = useState(() => {
     const newBubbles = [];
     for (let i = 0; i < 15; i++) {
       newBubbles.push({
@@ -45,8 +34,16 @@ export default function Home() {
         animationDuration: Math.random() * 20 + 10,
       });
     }
-    setBubbles(newBubbles);
-  }, []);
+    return newBubbles;
+  });
+  
+  // Track actual level progress
+  const [levelProgress, setLevelProgress] = useState({
+    totalLevels: 6,
+    completedLevels: 0,
+    unlockedLevels: 1,
+    loading: true
+  });
 
   // Load actual level progress
   useEffect(() => {

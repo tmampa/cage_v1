@@ -67,51 +67,45 @@ function ProfilePage() {
   const [userStats, setUserStats] = useState(DEFAULT_USER_STATS);
   const [achievements, setAchievements] = useState([]);
 
+  // Sync local form state from profile and load stats
   useEffect(() => {
-    if (userProfile) {
-      setUsername(userProfile.username || '');
-      setSelectedAvatar(userProfile.avatarEmoji || '👤');
-      
-      // Load actual user stats from Postgres API instead of estimating
-      loadActualUserStats();
-    }
-  }, [userProfile]);
+    if (!userProfile) return;
 
-  const loadActualUserStats = async () => {
-    if (!user?.id) return;
+    // Sync form fields from profile (legitimate prop → state sync)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setUsername(userProfile.username || '');
+    setSelectedAvatar(userProfile.avatarEmoji || '👤');
 
-    try {
-      // Load progress from API
-      const res = await fetch('/api/progress');
-      const data = await res.json();
-      const progress = data.progress || [];
-      const completedLevels = progress.filter(p => p.completed).length;
+    const loadActualUserStats = async () => {
+      if (!user?.id) return;
 
-      const calculatedStats = {
-        ...DEFAULT_USER_STATS,
-        levelsCompleted: completedLevels,
-      };
+      try {
+        // Load progress from API
+        const res = await fetch('/api/progress');
+        const data = await res.json();
+        const progress = data.progress || [];
+        const completedLevels = progress.filter(p => p.completed).length;
 
-      setUserStats(calculatedStats);
+        const calculatedStats = {
+          ...DEFAULT_USER_STATS,
+          levelsCompleted: completedLevels,
+        };
 
-      // Load achievements from localStorage
-      const storedAchievements = localStorage.getItem(`achievements_${user.id}`);
-      const earnedAchievements = storedAchievements ? JSON.parse(storedAchievements) : [];
-      const achievementProgress = getAchievementProgress(calculatedStats, earnedAchievements);
-      setAchievements(achievementProgress);
-    } catch (error) {
-      console.error('Error loading user stats:', error);
-      setUserStats({ ...DEFAULT_USER_STATS });
-    }
-  };
+        setUserStats(calculatedStats);
 
-  useEffect(() => {
-    if (userProfile) {
-      setUsername(userProfile.username || '');
-      setSelectedAvatar(userProfile.avatarEmoji || '👤');
-      loadActualUserStats();
-    }
-  }, [userProfile]);
+        // Load achievements from localStorage
+        const storedAchievements = localStorage.getItem(`achievements_${user.id}`);
+        const earnedAchievements = storedAchievements ? JSON.parse(storedAchievements) : [];
+        const achievementProgress = getAchievementProgress(calculatedStats, earnedAchievements);
+        setAchievements(achievementProgress);
+      } catch (error) {
+        console.error('Error loading user stats:', error);
+        setUserStats({ ...DEFAULT_USER_STATS });
+      }
+    };
+
+    loadActualUserStats();
+  }, [userProfile, user?.id]);
 
   // Update chatbot context when profile data changes
   const handleSignOut = async () => {

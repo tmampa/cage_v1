@@ -11,6 +11,24 @@ import {
   BoltIcon
 } from '@heroicons/react/24/solid';
 
+const StatItem = ({ icon: Icon, value, label, color = "text-blue-600", pulse = false, compact = false }) => (
+  <motion.div
+    animate={pulse ? { scale: [1, 1.1, 1] } : {}}
+    transition={pulse ? { duration: 0.5, repeat: Infinity } : {}}
+    className={`flex items-center gap-2 ${compact ? 'gap-1' : 'gap-2'}`}
+  >
+    <Icon className={`${compact ? 'w-4 h-4' : 'w-5 h-5'} ${color}`} />
+    <div className="flex flex-col">
+      <span className={`font-bold ${color} ${compact ? 'text-sm' : 'text-base'}`}>
+        {value}
+      </span>
+      {!compact && (
+        <span className="text-xs text-gray-500">{label}</span>
+      )}
+    </div>
+  </motion.div>
+);
+
 export default function GameStats({ 
   score = 0,
   lives = 3,
@@ -25,24 +43,6 @@ export default function GameStats({
   const timePercentage = (timeLeft / 60) * 100;
   const isLowTime = timeLeft <= 10;
   const isLowLives = lives <= 1;
-
-  const StatItem = ({ icon: Icon, value, label, color = "text-blue-600", pulse = false }) => (
-    <motion.div
-      animate={pulse ? { scale: [1, 1.1, 1] } : {}}
-      transition={pulse ? { duration: 0.5, repeat: Infinity } : {}}
-      className={`flex items-center gap-2 ${compact ? 'gap-1' : 'gap-2'}`}
-    >
-      <Icon className={`${compact ? 'w-4 h-4' : 'w-5 h-5'} ${color}`} />
-      <div className="flex flex-col">
-        <span className={`font-bold ${color} ${compact ? 'text-sm' : 'text-base'}`}>
-          {value}
-        </span>
-        {!compact && (
-          <span className="text-xs text-gray-500">{label}</span>
-        )}
-      </div>
-    </motion.div>
-  );
 
   const renderLives = () => (
     <div className="flex items-center gap-1">
@@ -69,11 +69,12 @@ export default function GameStats({
     return (
       <div className="flex items-center justify-between w-full bg-white/80 backdrop-blur-sm rounded-lg px-3 py-2 shadow-sm">
         <div className="flex items-center gap-4">
-          <StatItem icon={StarIcon} value={score} color="text-yellow-500" />
+          <StatItem icon={StarIcon} value={score} color="text-yellow-500" compact />
           <StatItem 
             icon={LightBulbIcon} 
             value={hintsRemaining} 
-            color="text-blue-500" 
+            color="text-blue-500"
+            compact
           />
           {streak > 0 && (
             <StatItem 
@@ -81,6 +82,7 @@ export default function GameStats({
               value={streak} 
               color="text-orange-500"
               pulse={streak >= 3}
+              compact
             />
           )}
         </div>

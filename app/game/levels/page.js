@@ -129,6 +129,7 @@ export default function LevelsPage() {
     };
 
     loadUserProgress();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.isAdmin]);
 
 

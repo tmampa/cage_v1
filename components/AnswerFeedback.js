@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   CheckCircleIcon, 
@@ -40,6 +40,22 @@ export default function AnswerFeedback({
     return messages[Math.floor(Math.random() * messages.length)];
   };
 
+  // Pre-compute random values via lazy initializer (avoids impure calls during render)
+  const [randomMessage] = useState(
+    () => ({
+      correct: encouragementMessages.correct[Math.floor(Math.random() * encouragementMessages.correct.length)],
+      incorrect: encouragementMessages.incorrect[Math.floor(Math.random() * encouragementMessages.incorrect.length)],
+    }),
+  );
+
+  const [particleOffsets] = useState(
+    () =>
+      Array.from({ length: 8 }, () => ({
+        ax: `${50 + (Math.random() - 0.5) * 200}%`,
+        ay: `${50 + (Math.random() - 0.5) * 200}%`,
+      })),
+  );
+
   const getStreakMessage = (streak) => {
     if (streak >= 5) return "🔥 ON FIRE! Amazing streak!";
     if (streak >= 3) return "🌟 Great streak going!";
@@ -66,7 +82,7 @@ export default function AnswerFeedback({
           {/* Celebration particles for correct answers */}
           {isCorrect && (
             <div className="absolute inset-0 pointer-events-none">
-              {[...Array(8)].map((_, i) => (
+              {particleOffsets.map((offsets, i) => (
                 <motion.div
                   key={i}
                   initial={{ 
@@ -78,8 +94,8 @@ export default function AnswerFeedback({
                   animate={{ 
                     opacity: 0,
                     scale: 1,
-                    x: `${50 + (Math.random() - 0.5) * 200}%`,
-                    y: `${50 + (Math.random() - 0.5) * 200}%`
+                    x: offsets.ax,
+                    y: offsets.ay
                   }}
                   transition={{ 
                     duration: 1.5,
@@ -120,7 +136,7 @@ export default function AnswerFeedback({
                   ${isCorrect ? 'text-green-700' : 'text-red-700'}
                 `}
               >
-                {getRandomMessage(isCorrect ? 'correct' : 'incorrect')}
+                {randomMessage[isCorrect ? 'correct' : 'incorrect']}
               </motion.h4>
 
               {/* Streak indicator */}

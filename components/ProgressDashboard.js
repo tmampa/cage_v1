@@ -31,7 +31,7 @@ export default function ProgressDashboard({
     return null;
   };
   // Sample achievements for demo purposes when no real achievements are loaded
-  const sampleAchievements = [
+  const [sampleAchievements] = useState(() => [
     {
       id: 'first_steps',
       title: 'First Steps',
@@ -48,7 +48,7 @@ export default function ProgressDashboard({
       points: 10,
       earnedAt: new Date(Date.now() - 172800000).toISOString() // 2 days ago
     }
-  ];
+  ]);
 
   // Use real achievements if available, otherwise show samples for completed users
   const displayAchievements = recentAchievements.length > 0 

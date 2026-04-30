@@ -192,7 +192,7 @@ export default function FeedbackButton() {
                   animate={{ opacity: 1, y: 0 }}
                   className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg mb-4"
                 >
-                  Thanks for your feedback! We'll read it carefully. 🎉
+                  Thanks for your feedback! We&apos;ll read it carefully. 🎉
                 </motion.div>
               )}
 

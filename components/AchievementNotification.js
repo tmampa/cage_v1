@@ -27,6 +27,17 @@ export default function AchievementNotification({
     }
   }, [achievement, autoClose, autoCloseDelay, onClose]);
 
+  // Pre-compute random particle positions (lazy init avoids impure calls during render)
+  const [particleOffsets] = useState(
+    () =>
+      Array.from({ length: 6 }, () => ({
+        ix: Math.random() * 100 - 50,
+        iy: Math.random() * 100 - 50,
+        ax: (Math.random() - 0.5) * 200,
+        ay: (Math.random() - 0.5) * 200,
+      })),
+  );
+
   if (!achievement || !isVisible) return null;
 
   return (
@@ -86,20 +97,20 @@ export default function AchievementNotification({
         
         {/* Celebration particles effect */}
         <div className="absolute inset-0 pointer-events-none">
-          {[...Array(6)].map((_, i) => (
+          {particleOffsets.map((offsets, i) => (
             <motion.div
               key={i}
               initial={{ 
                 opacity: 1, 
                 scale: 0,
-                x: Math.random() * 100 - 50,
-                y: Math.random() * 100 - 50
+                x: offsets.ix,
+                y: offsets.iy
               }}
               animate={{ 
                 opacity: 0, 
                 scale: 1,
-                x: (Math.random() - 0.5) * 200,
-                y: (Math.random() - 0.5) * 200
+                x: offsets.ax,
+                y: offsets.ay
               }}
               transition={{ 
                 duration: 2,

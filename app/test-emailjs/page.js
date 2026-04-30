@@ -5,27 +5,24 @@ import emailjs from '@emailjs/browser';
 
 function EmailJSTest() {
   const [status, setStatus] = useState('');
-  const [config, setConfig] = useState({});
+  const [config] = useState(() => ({
+    serviceId: process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID,
+    templateId: process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID,
+    publicKey: process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY,
+  }));
 
   useEffect(() => {
-    // Check environment variables
-    const emailjsConfig = {
-      serviceId: process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID,
-      templateId: process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID,
-      publicKey: process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY,
-    };
-    
-    setConfig(emailjsConfig);
-    console.log('EmailJS Config:', emailjsConfig);
+    console.log('EmailJS Config:', config);
     
     // Initialize EmailJS
-    if (emailjsConfig.publicKey) {
-      emailjs.init(emailjsConfig.publicKey);
+    if (config.publicKey) {
+      emailjs.init(config.publicKey);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- init status after side effect
       setStatus('EmailJS initialized');
     } else {
       setStatus('EmailJS public key missing');
     }
-  }, []);
+  }, [config]);
 
   const testEmailJS = async () => {
     setStatus('Sending test email...');
