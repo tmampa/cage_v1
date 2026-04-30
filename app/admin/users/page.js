@@ -1,8 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import AdminGuard from '../../../components/AdminGuard';
+import {
+  AdminBadge,
+  AdminEmpty,
+  AdminError,
+  AdminLoading,
+  AdminPanel,
+  AdminShell,
+} from '../../../components/admin/AdminLayout';
 import { adminFetch } from '../../../lib/adminFetch';
 
 function UsersContent() {
@@ -14,14 +23,29 @@ function UsersContent() {
   const [order, setOrder] = useState('desc');
 
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
+
     adminFetch(`/api/admin/users?sortBy=${sortBy}&order=${order}&search=${encodeURIComponent(search)}`)
-      .then((data) => setUsers(data.users || []))
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+      .then((data) => {
+        if (!cancelled) {
+          setUsers(data.users || []);
+          setError(null);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [sortBy, order, search]);
 
   const toggleSort = (field) => {
+    setLoading(true);
     if (sortBy === field) {
       setOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'));
     } else {
@@ -30,104 +54,105 @@ function UsersContent() {
     }
   };
 
+  const handleSearchChange = (value) => {
+    setLoading(true);
+    setSearch(value);
+  };
+
   const sortIndicator = (field) => {
-    if (sortBy !== field) return '';
-    return order === 'desc' ? ' ↓' : ' ↑';
+    if (sortBy !== field) return null;
+    return <span className="ml-1 text-slate-400">{order === 'desc' ? '↓' : '↑'}</span>;
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
-      <header className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">User Management</h1>
-            <p className="text-sm text-gray-500">{users.length} users found</p>
+    <AdminShell
+      title="User Management"
+      description="Review player accounts, scores, completion progress, and latest activity."
+    >
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="relative w-full max-w-md">
+            <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="search"
+              placeholder="Search by username"
+              value={search}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="w-full rounded-md border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+            />
           </div>
-          <Link href="/admin" className="text-sm text-purple-600 hover:text-purple-800 font-medium">
-            ← Dashboard
-          </Link>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Search */}
-        <div className="mb-6">
-          <input
-            type="text"
-            placeholder="Search by username or email..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full max-w-md px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none bg-white"
-          />
+          <AdminBadge tone="slate">{users.length} players</AdminBadge>
         </div>
 
-        {error && <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 mb-6">{error}</div>}
+        {error && <AdminError message={error} />}
 
         {loading ? (
-          <div className="text-center py-16">
-            <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            <p className="text-gray-500">Loading users...</p>
-          </div>
+          <AdminLoading label="Loading users..." />
         ) : (
-          <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+          <AdminPanel>
             <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="bg-gray-50 border-b">
-                    <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">User</th>
-                    <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase cursor-pointer hover:text-purple-600" onClick={() => toggleSort('score')}>
+              <table className="w-full min-w-[760px] text-left">
+                <thead className="border-b border-slate-200 bg-slate-50">
+                  <tr>
+                    <th className="px-5 py-3 text-xs font-semibold uppercase text-slate-500">Player</th>
+                    <th
+                      className="cursor-pointer px-5 py-3 text-xs font-semibold uppercase text-slate-500 transition hover:text-slate-950"
+                      onClick={() => toggleSort('score')}
+                    >
                       Score{sortIndicator('score')}
                     </th>
-                    <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Levels</th>
-                    <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Last Played</th>
-                    <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase">Actions</th>
+                    <th className="px-5 py-3 text-xs font-semibold uppercase text-slate-500">Levels</th>
+                    <th className="px-5 py-3 text-xs font-semibold uppercase text-slate-500">Last Played</th>
+                    <th className="px-5 py-3 text-right text-xs font-semibold uppercase text-slate-500">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {users.map((u) => (
-                    <tr key={u.id} className="hover:bg-purple-50/30 transition-colors">
-                      <td className="px-6 py-4">
+                <tbody className="divide-y divide-slate-100">
+                  {users.map((user) => (
+                    <tr key={user.id} className="transition hover:bg-slate-50">
+                      <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
-                          <span className="text-2xl">{u.avatar_emoji || '👤'}</span>
+                          <span className="grid h-10 w-10 place-items-center rounded-md bg-slate-100 text-xl">
+                            {user.avatarEmoji || '👤'}
+                          </span>
                           <div>
-                            <p className="font-medium text-gray-800">{u.username}</p>
-                            <p className="text-sm text-gray-500">{u.email}</p>
+                            <p className="text-sm font-semibold text-slate-950">{user.username}</p>
+                            <p className="text-xs text-slate-500">Player ID {user.id}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 font-semibold text-gray-800">{u.score || 0}</td>
-                      <td className="px-6 py-4">
-                        <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded-lg text-sm font-medium">
-                          {u.levelsCompleted}/6
-                        </span>
+                      <td className="px-5 py-4 text-sm font-semibold text-slate-950">{user.score || 0}</td>
+                      <td className="px-5 py-4">
+                        <AdminBadge tone={user.levelsCompleted > 0 ? 'blue' : 'slate'}>
+                          {user.levelsCompleted}/6 complete
+                        </AdminBadge>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
-                        {u.lastPlayed ? new Date(u.lastPlayed).toLocaleDateString() : 'Never'}
+                      <td className="px-5 py-4 text-sm text-slate-600">
+                        {user.lastPlayed ? new Date(user.lastPlayed).toLocaleDateString() : 'Never'}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-5 py-4 text-right">
                         <Link
-                          href={`/admin/users/${u.id}`}
-                          className="text-purple-600 hover:text-purple-800 text-sm font-medium"
+                          href={`/admin/users/${user.id}`}
+                          className="inline-flex rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
                         >
-                          View Details →
+                          View details
                         </Link>
                       </td>
                     </tr>
                   ))}
                   {users.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-6 py-10 text-center text-gray-500">
-                        No users found
+                      <td colSpan={5} className="px-5 py-10">
+                        <AdminEmpty title="No users found" description="Try changing the search term." />
                       </td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
-          </div>
+          </AdminPanel>
         )}
-      </main>
-    </div>
+      </div>
+    </AdminShell>
   );
 }
 

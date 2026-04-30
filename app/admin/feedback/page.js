@@ -1,8 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import AdminGuard from '../../../components/AdminGuard';
+import {
+  AdminBadge,
+  AdminEmpty,
+  AdminError,
+  AdminLoading,
+  AdminPanel,
+  AdminShell,
+} from '../../../components/admin/AdminLayout';
 import { adminFetch } from '../../../lib/adminFetch';
 
 function FeedbackContent() {
@@ -52,20 +59,11 @@ function FeedbackContent() {
         body: JSON.stringify({ feedbackId: id, resolved: !currentResolved }),
       });
       setFeedback((prev) =>
-        prev.map((f) => (f.id === id ? { ...f, resolved: !currentResolved } : f))
+        prev.map((item) => (item.id === id ? { ...item, resolved: !currentResolved } : item))
       );
     } catch (e) {
-      alert('Failed to update: ' + e.message);
+      setError(`Failed to update feedback: ${e.message}`);
     }
-  };
-
-  const typeBadge = (type) => {
-    const styles = {
-      bug: 'bg-red-100 text-red-700',
-      feature: 'bg-green-100 text-green-700',
-      general: 'bg-blue-100 text-blue-700',
-    };
-    return styles[type] || styles.general;
   };
 
   const formatSubmittedAt = (createdAt) => {
@@ -78,114 +76,99 @@ function FeedbackContent() {
     return Number.isNaN(timestamp.getTime()) ? 'Unknown' : timestamp.toLocaleString();
   };
 
+  const typeTone = (type) => {
+    if (type === 'bug') return 'red';
+    if (type === 'feature') return 'green';
+    return 'blue';
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
-      <header className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">Feedback Management</h1>
-            <p className="text-sm text-gray-500">{feedback.length} items</p>
+    <AdminShell title="Feedback" description="Review player feedback, filter by type or status, and track resolution.">
+      <div className="space-y-6">
+        <AdminPanel>
+          <div className="flex flex-wrap items-end gap-4 p-5">
+            <label className="grid gap-1 text-sm font-medium text-slate-700">
+              <span>Type</span>
+              <select
+                value={filterType}
+                onChange={(e) => handleTypeChange(e.target.value)}
+                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+              >
+                <option value="all">All types</option>
+                <option value="general">General</option>
+                <option value="bug">Bug</option>
+                <option value="feature">Feature</option>
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm font-medium text-slate-700">
+              <span>Status</span>
+              <select
+                value={filterStatus}
+                onChange={(e) => handleStatusChange(e.target.value)}
+                className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+              >
+                <option value="all">All</option>
+                <option value="unresolved">Open</option>
+                <option value="resolved">Resolved</option>
+              </select>
+            </label>
+            <AdminBadge tone="slate">{feedback.length} items</AdminBadge>
           </div>
-          <Link href="/admin" className="text-sm text-purple-600 hover:text-purple-800 font-medium">
-            ← Dashboard
-          </Link>
-        </div>
-      </header>
+        </AdminPanel>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Filters */}
-        <div className="flex flex-wrap gap-4 mb-6">
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase block mb-1">Type</label>
-            <select
-              value={filterType}
-              onChange={(e) => handleTypeChange(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-purple-500 focus:outline-none text-sm"
-            >
-              <option value="all">All Types</option>
-              <option value="general">General</option>
-              <option value="bug">Bug</option>
-              <option value="feature">Feature</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase block mb-1">Status</label>
-            <select
-              value={filterStatus}
-              onChange={(e) => handleStatusChange(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-purple-500 focus:outline-none text-sm"
-            >
-              <option value="all">All</option>
-              <option value="unresolved">Open</option>
-              <option value="resolved">Resolved</option>
-            </select>
-          </div>
-        </div>
-
-        {error && <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 mb-6">{error}</div>}
+        {error && <AdminError message={error} />}
 
         {loading ? (
-          <div className="text-center py-16">
-            <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            <p className="text-gray-500">Loading feedback...</p>
-          </div>
+          <AdminLoading label="Loading feedback..." />
         ) : feedback.length === 0 ? (
-          <div className="text-center py-16 text-gray-500">No feedback found</div>
+          <AdminEmpty title="No feedback found" description="Try a different filter combination." />
         ) : (
-          <div className="space-y-4">
-            {feedback.map((f) => (
-              <div key={f.id} className="bg-white rounded-2xl shadow-md overflow-hidden">
-                {/* Header row */}
-                <button
-                  onClick={() => setExpandedId(expandedId === f.id ? null : f.id)}
-                  className="w-full flex items-center gap-4 px-6 py-4 hover:bg-gray-50 transition-colors text-left"
-                >
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${typeBadge(f.feedbackType)}`}>
-                    {f.feedbackType}
-                  </span>
-                  <span className="text-yellow-400 text-sm min-w-[60px]">{'⭐'.repeat(f.rating || 0)}</span>
-                  <span className="text-sm text-gray-700 flex-1 truncate">{f.message}</span>
-                  <span className="text-xs text-gray-500 whitespace-nowrap">
-                    {f.username || 'Anonymous'}
-                  </span>
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded ${
-                      f.resolved ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                    }`}
+          <AdminPanel>
+            <div className="divide-y divide-slate-100">
+              {feedback.map((item) => (
+                <div key={item.id}>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
+                    className="grid w-full grid-cols-1 gap-3 px-5 py-4 text-left transition hover:bg-slate-50 lg:grid-cols-[8rem_6rem_1fr_9rem_6rem]"
                   >
-                    {f.resolved ? 'Resolved' : 'Open'}
-                  </span>
-                </button>
+                    <AdminBadge tone={typeTone(item.feedbackType)}>{item.feedbackType}</AdminBadge>
+                    <span className="text-sm font-medium text-amber-500">{'★'.repeat(item.rating || 0) || 'No rating'}</span>
+                    <span className="min-w-0 truncate text-sm text-slate-700">{item.message}</span>
+                    <span className="text-sm text-slate-500">{item.username || 'Anonymous'}</span>
+                    <AdminBadge tone={item.resolved ? 'green' : 'amber'}>{item.resolved ? 'Resolved' : 'Open'}</AdminBadge>
+                  </button>
 
-                {/* Expanded details */}
-                {expandedId === f.id && (
-                  <div className="border-t px-6 py-4 bg-gray-50 space-y-3">
-                    <p className="text-gray-700">{f.message}</p>
-                    <div className="flex flex-wrap gap-4 text-sm text-gray-500">
-                      <span>User: {f.username || 'Anonymous'}</span>
-                      {f.userScore !== null && f.userScore !== undefined && (
-                        <span>User Score: {f.userScore}</span>
-                      )}
-                      <span>Submitted: {formatSubmittedAt(f.createdAt)}</span>
+                  {expandedId === item.id && (
+                    <div className="border-t border-slate-200 bg-slate-50 px-5 py-4">
+                      <p className="max-w-4xl text-sm leading-6 text-slate-700">{item.message}</p>
+                      <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-500">
+                        <span>User: {item.username || 'Anonymous'}</span>
+                        {item.userScore !== null && item.userScore !== undefined && (
+                          <span>User Score: {item.userScore}</span>
+                        )}
+                        <span>Submitted: {formatSubmittedAt(item.createdAt)}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleResolved(item.id, item.resolved)}
+                        className={`mt-4 rounded-md px-3 py-2 text-sm font-medium transition ${
+                          item.resolved
+                            ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                            : 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                        }`}
+                      >
+                        {item.resolved ? 'Reopen' : 'Mark resolved'}
+                      </button>
                     </div>
-                    <button
-                      onClick={() => toggleResolved(f.id, f.resolved)}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        f.resolved
-                          ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
-                          : 'bg-green-100 text-green-700 hover:bg-green-200'
-                      }`}
-                    >
-                      {f.resolved ? 'Reopen' : 'Mark Resolved'}
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </AdminPanel>
         )}
-      </main>
-    </div>
+      </div>
+    </AdminShell>
   );
 }
 

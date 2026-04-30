@@ -1,8 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import {
+  ChartBarIcon,
+  ClipboardDocumentCheckIcon,
+  EnvelopeIcon,
+  UsersIcon,
+} from '@heroicons/react/24/outline';
 import AdminGuard from '../../../components/AdminGuard';
+import {
+  AdminBadge,
+  AdminEmpty,
+  AdminError,
+  AdminLoading,
+  AdminPanel,
+  AdminShell,
+  AdminStatCard,
+} from '../../../components/admin/AdminLayout';
 import { adminFetch } from '../../../lib/adminFetch';
 
 const LEVEL_NAMES = {
@@ -21,181 +35,142 @@ function AnalyticsContent() {
 
   useEffect(() => {
     adminFetch('/api/admin/analytics')
-      .then(setData)
+      .then((payload) => {
+        setData(payload);
+        setError(null);
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50">
-        <div className="text-center">
-          <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-gray-500">Loading analytics...</p>
-        </div>
-      </div>
+      <AdminShell title="Analytics" description="Performance and engagement trends across the learning game.">
+        <AdminLoading label="Loading analytics..." />
+      </AdminShell>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 to-purple-50">
-        <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-red-700 max-w-md">{error}</div>
-      </div>
+      <AdminShell title="Analytics" description="Performance and engagement trends across the learning game.">
+        <AdminError message={error} />
+      </AdminShell>
     );
   }
 
   const { users, levels, feedback } = data;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
-      <header className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-800">Learning Analytics</h1>
-          <Link href="/admin" className="text-sm text-purple-600 hover:text-purple-800 font-medium">
-            ← Dashboard
-          </Link>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        {/* Summary Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            { label: 'Total Users', value: users.totalUsers, color: 'text-blue-600', bg: 'bg-blue-50' },
-            { label: 'Avg Score', value: users.avgScore, color: 'text-purple-600', bg: 'bg-purple-50' },
-            { label: 'Pass Rate', value: `${users.overallPassRate}%`, color: 'text-green-600', bg: 'bg-green-50' },
-            { label: 'Feedback', value: feedback.feedbackCount, color: 'text-orange-600', bg: 'bg-orange-50' },
-          ].map((c) => (
-            <div key={c.label} className={`${c.bg} rounded-2xl p-6 text-center`}>
-              <p className="text-sm font-medium text-gray-500">{c.label}</p>
-              <p className={`text-3xl font-bold mt-1 ${c.color}`}>{c.value}</p>
-            </div>
-          ))}
+    <AdminShell title="Analytics" description="Track player participation, level outcomes, scores, and feedback quality.">
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <AdminStatCard label="Total Players" value={users.totalUsers} icon={UsersIcon} tone="blue" />
+          <AdminStatCard label="Average Score" value={users.avgScore} icon={ChartBarIcon} tone="slate" />
+          <AdminStatCard label="Pass Rate" value={`${users.overallPassRate}%`} icon={ClipboardDocumentCheckIcon} tone="green" />
+          <AdminStatCard label="Feedback" value={feedback.feedbackCount} icon={EnvelopeIcon} tone="amber" />
         </div>
 
-        {/* Level-by-Level Analysis */}
-        <div className="bg-white rounded-2xl shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-6">Level Performance</h3>
+        <AdminPanel title="Level Performance" description="Attempts, completions, pass rate, and average score per level.">
           {levels.length === 0 ? (
-            <p className="text-gray-500">No gameplay data available yet</p>
+            <div className="p-5">
+              <AdminEmpty title="No gameplay data available yet" />
+            </div>
           ) : (
-            <div className="space-y-6">
-              {levels.map((l) => (
-                <div key={l.levelId} className="border rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-3">
+            <div className="divide-y divide-slate-100">
+              {levels.map((level) => (
+                <div key={level.levelId} className="px-5 py-4">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <h4 className="font-semibold text-gray-800">
-                        Level {l.levelId}: {LEVEL_NAMES[l.levelId] || `Level ${l.levelId}`}
-                      </h4>
+                      <h3 className="text-sm font-semibold text-slate-950">
+                        Level {level.levelId}: {LEVEL_NAMES[level.levelId] || `Level ${level.levelId}`}
+                      </h3>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {level.attempts} attempts, {level.completions} completions
+                      </p>
                     </div>
-                    <div className="flex gap-4 text-sm">
-                      <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full">{l.attempts} attempts</span>
-                      <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full">{l.completions} completions</span>
-                    </div>
-                  </div>
-
-                  {/* Pass Rate Bar */}
-                  <div className="mb-2">
-                    <div className="flex justify-between text-sm text-gray-500 mb-1">
-                      <span>Pass Rate</span>
-                      <span className="font-medium">{l.passRate}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-3">
-                      <div
-                        className={`h-3 rounded-full transition-all ${
-                          l.passRate >= 70 ? 'bg-green-500' : l.passRate >= 40 ? 'bg-yellow-500' : 'bg-red-500'
-                        }`}
-                        style={{ width: `${l.passRate}%` }}
-                      />
+                    <div className="flex gap-2">
+                      <AdminBadge tone={level.passRate >= 70 ? 'green' : level.passRate >= 40 ? 'amber' : 'red'}>
+                        {level.passRate}% pass
+                      </AdminBadge>
+                      <AdminBadge tone="blue">{level.avgScore} avg score</AdminBadge>
                     </div>
                   </div>
 
-                  {/* Avg Score Bar */}
-                  <div>
-                    <div className="flex justify-between text-sm text-gray-500 mb-1">
-                      <span>Avg Score</span>
-                      <span className="font-medium">{l.avgScore}</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-3">
-                      <div
-                        className="bg-purple-500 h-3 rounded-full transition-all"
-                        style={{ width: `${Math.min(l.avgScore, 100)}%` }}
-                      />
-                    </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <MetricBar label="Pass rate" value={level.passRate} tone="green" suffix="%" />
+                    <MetricBar label="Average score" value={Math.min(level.avgScore, 100)} displayValue={level.avgScore} tone="blue" />
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </div>
+        </AdminPanel>
 
-        {/* Score Distribution */}
-        <div className="bg-white rounded-2xl shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">User Score Distribution</h3>
-          <div className="space-y-3">
-            {Object.entries(users.scoreBuckets).map(([range, count]) => {
-              const pct = users.totalUsers > 0 ? (count / users.totalUsers) * 100 : 0;
-              return (
-                <div key={range} className="flex items-center gap-4">
-                  <span className="text-sm text-gray-600 w-20 text-right">{range}</span>
-                  <div className="flex-1 bg-gray-200 rounded-full h-4">
-                    <div className="bg-indigo-500 h-4 rounded-full transition-all" style={{ width: `${pct}%` }} />
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <AdminPanel title="Score Distribution" description="Player count by total score range.">
+            <div className="divide-y divide-slate-100">
+              {Object.entries(users.scoreBuckets).map(([range, count]) => {
+                const pct = users.totalUsers > 0 ? (count / users.totalUsers) * 100 : 0;
+                return (
+                  <div key={range} className="grid grid-cols-[5rem_1fr_4.5rem] items-center gap-4 px-5 py-3 text-sm">
+                    <span className="font-medium text-slate-600">{range}</span>
+                    <div className="h-2 rounded-full bg-slate-100">
+                      <div className="h-2 rounded-full bg-blue-500" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="text-right font-semibold text-slate-900">{count} ({Math.round(pct)}%)</span>
                   </div>
-                  <span className="text-sm font-medium w-12">
-                    {count} <span className="text-gray-400">({Math.round(pct)}%)</span>
-                  </span>
+                );
+              })}
+            </div>
+          </AdminPanel>
+
+          <AdminPanel title="Feedback Breakdown" description="Type and rating distribution.">
+            <div className="space-y-6 p-5">
+              <div className="space-y-3">
+                {Object.entries(feedback.typeDist).map(([type, count]) => {
+                  const pct = feedback.feedbackCount > 0 ? Math.round((count / feedback.feedbackCount) * 100) : 0;
+                  const tone = type === 'bug' ? 'red' : type === 'feature' ? 'green' : 'blue';
+                  return (
+                    <MetricBar key={type} label={type} value={pct} displayValue={`${count} (${pct}%)`} tone={tone} />
+                  );
+                })}
+              </div>
+              <div className="border-t border-slate-200 pt-5">
+                <div className="space-y-3">
+                  {[5, 4, 3, 2, 1].map((rating) => {
+                    const count = feedback.ratingDist[rating] || 0;
+                    const pct = feedback.feedbackCount > 0 ? Math.round((count / feedback.feedbackCount) * 100) : 0;
+                    return (
+                      <MetricBar key={rating} label={`${rating} star`} value={pct} displayValue={`${count} (${pct}%)`} tone="amber" />
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Feedback Breakdown */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Type Distribution */}
-          <div className="bg-white rounded-2xl shadow-md p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Feedback by Type</h3>
-            <div className="space-y-3">
-              {Object.entries(feedback.typeDist).map(([type, count]) => {
-                const total = feedback.feedbackCount || 1;
-                const pct = Math.round((count / total) * 100);
-                const colors = { general: 'bg-blue-500', bug: 'bg-red-500', feature: 'bg-green-500' };
-                return (
-                  <div key={type} className="flex items-center gap-3">
-                    <span className="capitalize text-sm text-gray-600 w-20">{type}</span>
-                    <div className="flex-1 bg-gray-200 rounded-full h-3">
-                      <div className={`${colors[type]} h-3 rounded-full`} style={{ width: `${pct}%` }} />
-                    </div>
-                    <span className="text-sm font-medium w-14">{count} ({pct}%)</span>
-                  </div>
-                );
-              })}
+              </div>
             </div>
-          </div>
-
-          {/* Rating Distribution */}
-          <div className="bg-white rounded-2xl shadow-md p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Rating Distribution</h3>
-            <div className="space-y-3">
-              {[5, 4, 3, 2, 1].map((r) => {
-                const count = feedback.ratingDist[r] || 0;
-                const total = feedback.feedbackCount || 1;
-                const pct = Math.round((count / total) * 100);
-                return (
-                  <div key={r} className="flex items-center gap-3">
-                    <span className="text-sm text-yellow-400 w-20">{'⭐'.repeat(r)}</span>
-                    <div className="flex-1 bg-gray-200 rounded-full h-3">
-                      <div className="bg-yellow-400 h-3 rounded-full" style={{ width: `${pct}%` }} />
-                    </div>
-                    <span className="text-sm font-medium w-14">{count} ({pct}%)</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          </AdminPanel>
         </div>
-      </main>
+      </div>
+    </AdminShell>
+  );
+}
+
+function MetricBar({ label, value, displayValue, suffix = '', tone = 'slate' }) {
+  const colors = {
+    slate: 'bg-slate-500',
+    blue: 'bg-blue-500',
+    green: 'bg-emerald-500',
+    amber: 'bg-amber-400',
+    red: 'bg-red-500',
+  };
+
+  return (
+    <div className="grid grid-cols-[6rem_1fr_4.5rem] items-center gap-3 text-sm">
+      <span className="capitalize text-slate-500">{label}</span>
+      <div className="h-2 rounded-full bg-slate-100">
+        <div className={`h-2 rounded-full ${colors[tone] || colors.slate}`} style={{ width: `${Math.min(value, 100)}%` }} />
+      </div>
+      <span className="text-right font-semibold text-slate-900">{displayValue ?? `${value}${suffix}`}</span>
     </div>
   );
 }

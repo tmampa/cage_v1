@@ -1,15 +1,24 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import AdminGuard from '../../components/AdminGuard';
-import { adminFetch } from '../../lib/adminFetch';
 import {
-  UsersIcon,
+  ChartBarIcon,
   ChatBubbleLeftRightIcon,
   EnvelopeIcon,
-  ChartBarIcon,
-} from '@heroicons/react/24/solid';
+  UsersIcon,
+} from '@heroicons/react/24/outline';
+import AdminGuard from '../../components/AdminGuard';
+import {
+  AdminBadge,
+  AdminEmpty,
+  AdminError,
+  AdminLoading,
+  AdminPanel,
+  AdminShell,
+  AdminStatCard,
+} from '../../components/admin/AdminLayout';
+import { adminFetch } from '../../lib/adminFetch';
 
 function DashboardContent() {
   const [stats, setStats] = useState(null);
@@ -18,163 +27,134 @@ function DashboardContent() {
 
   useEffect(() => {
     adminFetch('/api/admin/analytics')
-      .then(setStats)
+      .then((data) => {
+        setStats(data);
+        setError(null);
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
 
   const cards = [
-    { title: 'Users', href: '/admin/users', icon: UsersIcon, color: 'from-blue-500 to-blue-600', stat: stats?.users?.totalUsers },
-    { title: 'Feedback', href: '/admin/feedback', icon: EnvelopeIcon, color: 'from-green-500 to-green-600', stat: stats?.feedback?.feedbackCount },
-    { title: 'Chat History', href: '/admin/chat', icon: ChatBubbleLeftRightIcon, color: 'from-purple-500 to-purple-600', stat: null },
-    { title: 'Analytics', href: '/admin/analytics', icon: ChartBarIcon, color: 'from-orange-500 to-orange-600', stat: null },
+    { title: 'Users', href: '/admin/users', icon: UsersIcon, stat: stats?.users?.totalUsers ?? '-', tone: 'blue' },
+    { title: 'Feedback', href: '/admin/feedback', icon: EnvelopeIcon, stat: stats?.feedback?.feedbackCount ?? '-', tone: 'green' },
+    { title: 'Chat History', href: '/admin/chat', icon: ChatBubbleLeftRightIcon, stat: 'View', tone: 'slate' },
+    { title: 'Analytics', href: '/admin/analytics', icon: ChartBarIcon, stat: 'Open', tone: 'amber' },
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur-md shadow-sm sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
-              CagE Admin
-            </h1>
-            <p className="text-sm text-gray-500">Dashboard Overview</p>
-          </div>
-          <Link href="/" className="text-sm text-purple-600 hover:text-purple-800 font-medium">
-            ← Back to Game
-          </Link>
-        </div>
-      </header>
+    <AdminShell
+      title="Overview"
+      description="Monitor learning activity, feedback, and account health from one focused workspace."
+    >
+      {error && <AdminError message={error} />}
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Navigation Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-          {cards.map((card) => (
-            <Link key={card.title} href={card.href}>
-              <div className="bg-white rounded-2xl shadow-md hover:shadow-lg transition-shadow p-6 group cursor-pointer">
-                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${card.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                  <card.icon className="w-6 h-6 text-white" />
+      {loading ? (
+        <AdminLoading label="Loading dashboard data..." />
+      ) : (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {cards.map((card) => (
+              <Link
+                key={card.title}
+                href={card.href}
+                className="group rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-slate-500">{card.title}</p>
+                    <p className="mt-2 text-3xl font-semibold text-slate-950">{card.stat}</p>
+                  </div>
+                  <span className="grid h-10 w-10 place-items-center rounded-md bg-slate-100 text-slate-700 transition group-hover:bg-slate-900 group-hover:text-white">
+                    <card.icon className="h-5 w-5" />
+                  </span>
                 </div>
-                <h2 className="text-lg font-semibold text-gray-800">{card.title}</h2>
-                {card.stat !== null && card.stat !== undefined && (
-                  <p className="text-3xl font-bold text-gray-900 mt-1">{card.stat}</p>
-                )}
-              </div>
-            </Link>
-          ))}
-        </div>
-
-        {/* Quick Stats */}
-        {loading && (
-          <div className="text-center py-10">
-            <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            <p className="text-gray-500">Loading dashboard stats...</p>
+              </Link>
+            ))}
           </div>
-        )}
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 mb-6">
-            {error}
-          </div>
-        )}
-
-        {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Users Overview */}
-            <div className="bg-white rounded-2xl shadow-md p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Users Overview</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between"><span className="text-gray-600">Total Users</span><span className="font-bold">{stats.users.totalUsers}</span></div>
-                <div className="flex justify-between"><span className="text-gray-600">New This Week</span><span className="font-bold text-green-600">+{stats.users.newUsersThisWeek}</span></div>
-                <div className="flex justify-between"><span className="text-gray-600">Average Score</span><span className="font-bold">{stats.users.avgScore}</span></div>
-                <div className="flex justify-between"><span className="text-gray-600">Overall Pass Rate</span><span className="font-bold">{stats.users.overallPassRate}%</span></div>
+          {stats && (
+            <>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+                <AdminStatCard label="New This Week" value={`+${stats.users.newUsersThisWeek}`} tone="green" icon={UsersIcon} />
+                <AdminStatCard label="Average Score" value={stats.users.avgScore} tone="blue" icon={ChartBarIcon} />
+                <AdminStatCard label="Pass Rate" value={`${stats.users.overallPassRate}%`} tone="green" icon={ChartBarIcon} />
+                <AdminStatCard label="Feedback" value={stats.feedback.feedbackCount} tone="amber" icon={EnvelopeIcon} />
               </div>
-            </div>
 
-            {/* Level Performance */}
-            <div className="bg-white rounded-2xl shadow-md p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Level Performance</h3>
-              {stats.levels.length === 0 ? (
-                <p className="text-gray-500">No gameplay data yet</p>
-              ) : (
-                <div className="space-y-3">
-                  {stats.levels.map((l) => (
-                    <div key={l.levelId} className="flex items-center justify-between">
-                      <span className="text-gray-600">Level {l.levelId}</span>
-                      <div className="flex items-center gap-4">
-                        <span className="text-sm text-gray-500">{l.attempts} plays</span>
-                        <div className="w-24 bg-gray-200 rounded-full h-2">
-                          <div className="bg-purple-500 h-2 rounded-full" style={{ width: `${l.passRate}%` }} />
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <AdminPanel title="Level Performance" description="Player attempts and pass rates by level.">
+                  {stats.levels.length === 0 ? (
+                    <div className="p-5">
+                      <AdminEmpty title="No gameplay data yet" />
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-100">
+                      {stats.levels.map((level) => (
+                        <div key={level.levelId} className="grid grid-cols-[1fr_auto] gap-4 px-5 py-4">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">Level {level.levelId}</p>
+                            <p className="mt-1 text-xs text-slate-500">{level.attempts} attempts</p>
+                          </div>
+                          <div className="flex min-w-40 items-center gap-3">
+                            <div className="h-2 flex-1 rounded-full bg-slate-100">
+                              <div className="h-2 rounded-full bg-emerald-500" style={{ width: `${level.passRate}%` }} />
+                            </div>
+                            <span className="w-10 text-right text-sm font-semibold text-slate-700">{level.passRate}%</span>
+                          </div>
                         </div>
-                        <span className="text-sm font-medium w-12 text-right">{l.passRate}%</span>
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                  )}
+                </AdminPanel>
 
-            {/* Score Distribution */}
-            <div className="bg-white rounded-2xl shadow-md p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Score Distribution</h3>
-              <div className="space-y-2">
-                {Object.entries(stats.users.scoreBuckets).map(([range, count]) => (
-                  <div key={range} className="flex items-center gap-3">
-                    <span className="text-sm text-gray-600 w-16">{range}</span>
-                    <div className="flex-1 bg-gray-200 rounded-full h-3">
-                      <div
-                        className="bg-indigo-500 h-3 rounded-full transition-all"
-                        style={{
-                          width: `${stats.users.totalUsers > 0 ? (count / stats.users.totalUsers) * 100 : 0}%`,
-                        }}
-                      />
+                <AdminPanel title="Feedback Summary" description="Current feedback type and rating spread.">
+                  <div className="space-y-5 p-5">
+                    <div className="flex flex-wrap gap-2">
+                      <AdminBadge tone="blue">General: {stats.feedback.typeDist.general}</AdminBadge>
+                      <AdminBadge tone="red">Bugs: {stats.feedback.typeDist.bug}</AdminBadge>
+                      <AdminBadge tone="green">Features: {stats.feedback.typeDist.feature}</AdminBadge>
                     </div>
-                    <span className="text-sm font-medium w-8 text-right">{count}</span>
+                    <div className="space-y-2">
+                      {[5, 4, 3, 2, 1].map((rating) => {
+                        const count = stats.feedback.ratingDist[rating] || 0;
+                        const pct = stats.feedback.feedbackCount > 0 ? (count / stats.feedback.feedbackCount) * 100 : 0;
+                        return (
+                          <div key={rating} className="grid grid-cols-[3rem_1fr_2rem] items-center gap-3 text-sm">
+                            <span className="text-slate-500">{rating} star</span>
+                            <div className="h-2 rounded-full bg-slate-100">
+                              <div className="h-2 rounded-full bg-amber-400" style={{ width: `${pct}%` }} />
+                            </div>
+                            <span className="text-right font-semibold text-slate-700">{count}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                ))}
+                </AdminPanel>
               </div>
-            </div>
 
-            {/* Feedback Summary */}
-            <div className="bg-white rounded-2xl shadow-md p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Feedback Summary</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Feedback</span>
-                  <span className="font-bold">{stats.feedback.feedbackCount}</span>
-                </div>
-                <div className="pt-2 border-t">
-                  <p className="text-sm text-gray-500 mb-2">By Type</p>
-                  <div className="flex gap-3">
-                    <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
-                      General: {stats.feedback.typeDist.general}
-                    </span>
-                    <span className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm">
-                      Bugs: {stats.feedback.typeDist.bug}
-                    </span>
-                    <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm">
-                      Features: {stats.feedback.typeDist.feature}
-                    </span>
-                  </div>
-                </div>
-                <div className="pt-2 border-t">
-                  <p className="text-sm text-gray-500 mb-2">Ratings</p>
-                  <div className="flex gap-2">
-                    {[1, 2, 3, 4, 5].map((r) => (
-                      <div key={r} className="text-center">
-                        <div className="text-yellow-400 text-sm">{'⭐'.repeat(r)}</div>
-                        <div className="text-xs font-medium text-gray-600">{stats.feedback.ratingDist[r]}</div>
+              <AdminPanel title="Score Distribution" description="How player scores are currently grouped.">
+                <div className="divide-y divide-slate-100">
+                  {Object.entries(stats.users.scoreBuckets).map(([range, count]) => {
+                    const pct = stats.users.totalUsers > 0 ? (count / stats.users.totalUsers) * 100 : 0;
+                    return (
+                      <div key={range} className="grid grid-cols-[5rem_1fr_4rem] items-center gap-4 px-5 py-3 text-sm">
+                        <span className="font-medium text-slate-600">{range}</span>
+                        <div className="h-2 rounded-full bg-slate-100">
+                          <div className="h-2 rounded-full bg-blue-500" style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="text-right font-semibold text-slate-900">{count}</span>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
-    </div>
+              </AdminPanel>
+            </>
+          )}
+        </div>
+      )}
+    </AdminShell>
   );
 }
 
