@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
+import { useChatbot } from '../../context/ChatbotContext';
 import { motion } from 'framer-motion';
 import {
   ArrowLeftIcon,
@@ -16,9 +17,18 @@ import {
   PuzzlePieceIcon,
   ChartBarIcon,
   CalendarIcon,
+  FireIcon,
+  LightBulbIcon,
+  StarIcon,
 } from '@heroicons/react/24/solid';
 import AuthWrapper from '../../components/AuthWrapper';
 import FeedbackButton from '../../components/FeedbackButton';
+import EnhancedButton from '../../components/EnhancedButton';
+import { CircularProgress, AnimatedProgressBar } from '../../components/ProgressIndicators';
+import { AchievementsList } from '../../components/AchievementNotification';
+import { getAchievementProgress, DEFAULT_USER_STATS } from '../../utils/achievements';
+import { extractProfileContext } from '../../utils/chatbotContext';
+import BottomNav from '../../components/BottomNav';
 
 const avatarEmojis = [
   '👧',
@@ -53,14 +63,57 @@ function ProfilePage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('stats'); // 'stats', 'achievements'
+  const [userStats, setUserStats] = useState(DEFAULT_USER_STATS);
+  const [achievements, setAchievements] = useState([]);
 
   useEffect(() => {
     if (userProfile) {
       setUsername(userProfile.username || '');
       setSelectedAvatar(userProfile.avatar_emoji || '👤');
+      
+      // Load actual user stats from Postgres API instead of estimating
+      loadActualUserStats();
     }
   }, [userProfile]);
 
+  const loadActualUserStats = async () => {
+    if (!user?.id) return;
+
+    try {
+      // Load progress from API
+      const res = await fetch('/api/progress');
+      const data = await res.json();
+      const progress = data.progress || [];
+      const completedLevels = progress.filter(p => p.completed).length;
+
+      const calculatedStats = {
+        ...DEFAULT_USER_STATS,
+        levelsCompleted: completedLevels,
+      };
+
+      setUserStats(calculatedStats);
+
+      // Load achievements from localStorage
+      const storedAchievements = localStorage.getItem(`achievements_${user.id}`);
+      const earnedAchievements = storedAchievements ? JSON.parse(storedAchievements) : [];
+      const achievementProgress = getAchievementProgress(calculatedStats, earnedAchievements);
+      setAchievements(achievementProgress);
+    } catch (error) {
+      console.error('Error loading user stats:', error);
+      setUserStats({ ...DEFAULT_USER_STATS });
+    }
+  };
+
+  useEffect(() => {
+    if (userProfile) {
+      setUsername(userProfile.username || '');
+      setSelectedAvatar(userProfile.avatar_emoji || '👤');
+      loadActualUserStats();
+    }
+  }, [userProfile]);
+
+  // Update chatbot context when profile data changes
   const handleSignOut = async () => {
     try {
       await logout();
@@ -119,11 +172,19 @@ function ProfilePage() {
       }
 
       // Handle ISO strings or other date formats
-      return new Date(dateValue).toLocaleDateString();
+      if (dateValue) {
+        return new Date(dateValue).toLocaleDateString();
+      }
+      return 'Recently joined';
     } catch (error) {
       console.error('Error formatting date:', error);
       return 'Recently joined';
     }
+  };
+
+  // Get the join date from userProfile - check both camelCase and snake_case
+  const getJoinDate = () => {
+    return userProfile?.created_at || userProfile?.createdAt;
   };
 
   if (!user || !userProfile) {
@@ -192,7 +253,7 @@ function ProfilePage() {
                 <h2 className='text-xl font-bold text-purple-700'>
                   {username}
                 </h2>
-                <p className='text-sm text-blue-600'>{user.email}</p>
+                <p className='text-sm text-blue-600'>Joined CagE</p>
               </div>
             </div>
             {!isEditing ? (
@@ -237,8 +298,8 @@ function ProfilePage() {
                 <span className='text-sm'>Joined</span>
               </div>
               <p className='text-sm text-purple-700'>
-                {userProfile.created_at
-                  ? formatJoinedDate(userProfile.created_at)
+                {getJoinDate()
+                  ? formatJoinedDate(getJoinDate())
                   : 'Recently joined'}
               </p>
             </div>
@@ -309,27 +370,134 @@ function ProfilePage() {
           )}
         </motion.div>
 
-        {/* Quick Actions */}
-        <div className='grid grid-cols-2 gap-4 mb-6'>
-          <Link href='/game/levels' className='block'>
-            <div className='game-card p-4 hover:bg-blue-50 transition-colors'>
-              <div className='flex items-center gap-2 text-purple-600 mb-1'>
-                <PuzzlePieceIcon className='w-5 h-5' />
-                <span className='font-bold'>Play Game</span>
-              </div>
-              <p className='text-sm text-blue-600'>Start your next challenge</p>
-            </div>
-          </Link>
-          <Link href='/leaderboard' className='block'>
-            <div className='game-card p-4 hover:bg-blue-50 transition-colors'>
-              <div className='flex items-center gap-2 text-purple-600 mb-1'>
-                <ChartBarIcon className='w-5 h-5' />
-                <span className='font-bold'>Rankings</span>
-              </div>
-              <p className='text-sm text-blue-600'>Check the leaderboard</p>
-            </div>
-          </Link>
+        {/* Tab Navigation */}
+        <div className='flex bg-white rounded-lg p-1 mb-6 shadow-sm'>
+          <button
+            onClick={() => setActiveTab('stats')}
+            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'stats'
+                ? 'bg-purple-500 text-white'
+                : 'text-gray-600 hover:text-purple-600'
+            }`}
+          >
+            📊 Statistics
+          </button>
+          <button
+            onClick={() => setActiveTab('achievements')}
+            className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+              activeTab === 'achievements'
+                ? 'bg-purple-500 text-white'
+                : 'text-gray-600 hover:text-purple-600'
+            }`}
+          >
+            🏆 Achievements
+          </button>
         </div>
+
+        {/* Tab Content */}
+        {activeTab === 'stats' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className='space-y-6 mb-6'
+          >
+            {/* Detailed Stats */}
+            <div className='game-card p-6'>
+              <h3 className='text-lg font-bold text-purple-700 mb-4'>Your Progress</h3>
+              
+              <div className='grid grid-cols-2 gap-6 mb-6'>
+                <div className='text-center'>
+                  <CircularProgress
+                    progress={userStats.levelsCompleted}
+                    total={6}
+                    size={100}
+                    color="purple"
+                    label="Levels"
+                  />
+                </div>
+                <div className='text-center'>
+                  <CircularProgress
+                    progress={userStats.correctAnswers}
+                    total={Math.max(userStats.totalAnswers, 1)}
+                    size={100}
+                    color="green"
+                    label="Accuracy"
+                  />
+                </div>
+              </div>
+
+              <div className='space-y-4'>
+                <div>
+                  <AnimatedProgressBar
+                    progress={userStats.levelsCompleted}
+                    total={6}
+                    label="Levels Completed"
+                    color="blue"
+                  />
+                </div>
+                
+                <div className='grid grid-cols-2 gap-4'>
+                  <div className='bg-blue-50 rounded-lg p-3 text-center'>
+                    <div className='flex items-center justify-center gap-2 mb-1'>
+                      <StarIcon className='w-4 h-4 text-yellow-500' />
+                      <span className='text-sm text-gray-600'>Total Score</span>
+                    </div>
+                    <div className='text-xl font-bold text-purple-700'>
+                      {userProfile.score || 0}
+                    </div>
+                  </div>
+                  
+                  <div className='bg-green-50 rounded-lg p-3 text-center'>
+                    <div className='flex items-center justify-center gap-2 mb-1'>
+                      <CheckIcon className='w-4 h-4 text-green-500' />
+                      <span className='text-sm text-gray-600'>Correct</span>
+                    </div>
+                    <div className='text-xl font-bold text-green-700'>
+                      {userStats.correctAnswers}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className='grid grid-cols-2 gap-4'>
+              <Link href='/game/levels'>
+                <EnhancedButton 
+                  variant="primary" 
+                  className="w-full"
+                  icon={<PuzzlePieceIcon className="w-5 h-5" />}
+                >
+                  Continue Learning
+                </EnhancedButton>
+              </Link>
+              <Link href='/leaderboard'>
+                <EnhancedButton 
+                  variant="secondary" 
+                  className="w-full"
+                  icon={<ChartBarIcon className="w-5 h-5" />}
+                >
+                  View Rankings
+                </EnhancedButton>
+              </Link>
+            </div>
+          </motion.div>
+        )}
+
+        {activeTab === 'achievements' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className='mb-6'
+          >
+            <div className='game-card p-6'>
+              <AchievementsList 
+                achievements={achievements}
+                userStats={userStats}
+              />
+            </div>
+          </motion.div>
+        )}
 
         {/* Sign Out Button */}
         <motion.button
@@ -344,37 +512,7 @@ function ProfilePage() {
       </div>
 
       {/* Bottom navigation */}
-      <div className='fixed bottom-0 left-0 right-0 bg-white shadow-lg z-30'>
-        <div className='flex justify-around items-center'>
-          <Link href='/game/levels' className='flex-1'>
-            <div className='flex flex-col items-center py-3 text-blue-600'>
-              <HomeIcon className='w-6 h-6' />
-              <span className='text-xs mt-1'>Home</span>
-            </div>
-          </Link>
-
-          <Link href='/game/levels' className='flex-1'>
-            <div className='flex flex-col items-center py-3 text-blue-600'>
-              <PuzzlePieceIcon className='w-6 h-6' />
-              <span className='text-xs mt-1'>Levels</span>
-            </div>
-          </Link>
-
-          <Link href='/leaderboard' className='flex-1'>
-            <div className='flex flex-col items-center py-3 text-blue-600'>
-              <TrophyIcon className='w-6 h-6' />
-              <span className='text-xs mt-1'>Leaderboard</span>
-            </div>
-          </Link>
-
-          <Link href='/profile' className='flex-1'>
-            <div className='flex flex-col items-center py-3 text-purple-600 border-t-2 border-purple-600'>
-              <UserIcon className='w-6 h-6' />
-              <span className='text-xs mt-1'>Profile</span>
-            </div>
-          </Link>
-        </div>
-      </div>
+      <BottomNav activeTab="profile" />
 
       {/* Feedback Button */}
       <FeedbackButton />

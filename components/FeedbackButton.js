@@ -3,13 +3,14 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ChatBubbleLeftRightIcon,
+  EnvelopeIcon,
   XMarkIcon,
   PaperAirplaneIcon,
   StarIcon,
 } from '@heroicons/react/24/solid';
 import { useAuth } from '../context/AuthContext';
 import emailjs from '@emailjs/browser';
+import { checkAchievements, DEFAULT_USER_STATS } from '../utils/achievements';
 
 export default function FeedbackButton() {
   const { user, userProfile } = useAuth();
@@ -75,16 +76,35 @@ export default function FeedbackButton() {
       console.log('Sending feedback with EmailJS...', { serviceId, templateId });
       console.log('Template parameters:', templateParams);
 
-      // Send email using EmailJS (public key already initialized)
-      const result = await emailjs.send(
-        serviceId,
-        templateId,
-        templateParams
-      );
+      // Save feedback to DB
+      try {
+        await fetch('/api/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            feedbackType,
+            rating,
+            message: feedback,
+          }),
+        });
+      } catch (dbError) {
+        console.error('Failed to save feedback:', dbError);
+      }
 
-      console.log('Feedback sent successfully:', result.text);
+      // Send email using EmailJS
+      try {
+        const result = await emailjs.send(
+          serviceId,
+          templateId,
+          templateParams
+        );
+        console.log('Feedback sent successfully:', result.text);
+      } catch (emailError) {
+        console.error('EmailJS failed (feedback still saved):', emailError.text || emailError.message);
+      }
+
       setSubmitStatus('success');
-      
+
       // Reset form after 2 seconds
       setTimeout(() => {
         setFeedback('');
@@ -126,13 +146,13 @@ export default function FeedbackButton() {
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
         onClick={() => setIsModalOpen(true)}
-        className="fixed bottom-24 right-4 z-40 bg-gradient-to-r from-purple-500 to-blue-500 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300"
+        className="fixed bottom-24 right-4 z-40 bg-gradient-to-r from-green-500 to-emerald-500 text-white p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300"
         style={{ 
-          background: 'linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%)',
+          background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
           backdropFilter: 'blur(10px)',
         }}
       >
-        <ChatBubbleLeftRightIcon className="w-6 h-6" />
+        <EnvelopeIcon className="w-6 h-6" />
       </motion.button>
 
       {/* Feedback Modal */}

@@ -1,203 +1,97 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import {
-  auth,
-  db,
-  onAuthStateChange,
-  signIn,
-  signUp,
-  signInWithGoogle,
-  signOutUser,
-} from '../lib/firebase';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 
-// Create the authentication context
 const AuthContext = createContext({});
 
-// Custom hook to use the auth context
-export const useAuth = () => {
-  return useContext(AuthContext);
-};
+export const useAuth = () => useContext(AuthContext);
 
-// Provider component that wraps the app and makes auth object available to any child component that calls useAuth()
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch user profile data
-  const fetchUserProfile = async (userId, userData) => {
-    try {
-      console.log(
-        'Fetching user profile for:',
-        userId,
-        'with userData:',
-        userData
-      );
-      const userDocRef = doc(db, 'users', userId);
-      const userDoc = await getDoc(userDocRef);
-
-      if (userDoc.exists()) {
-        const profileData = userDoc.data();
-        console.log('User profile found:', profileData);
-        setUserProfile(profileData);
-      } else {
-        console.log('No user profile found, creating default profile');
-        // Create a default profile if one doesn't exist
-        const defaultProfile = {
-          username: userData.username || userData.email.split('@')[0],
-          email: userData.email,
-          avatar_emoji: '👤',
-          score: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-
-        try {
-          await setDoc(userDocRef, defaultProfile);
-          console.log('Created default profile:', defaultProfile);
-          setUserProfile(defaultProfile);
-        } catch (error) {
-          console.error('Error creating default profile:', error);
-          throw error;
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching/creating user profile:', error);
-      // Don't throw the error, but set a basic profile to prevent UI issues
-      setUserProfile({
-        username: userData.username || userData.email.split('@')[0],
-        email: userData.email,
-        avatar_emoji: '👤',
-        score: 0,
-      });
-    }
-  };
-
+  // Hydrate session from cookie on mount
   useEffect(() => {
-    console.log('Setting up auth state listener');
-    const unsubscribe = onAuthStateChange((authUser) => {
-      console.log(
-        'Auth state changed:',
-        authUser ? 'User logged in' : 'No user'
-      );
-      if (authUser) {
-        const userData = {
-          id: authUser.uid,
-          email: authUser.email,
-          username: authUser.displayName || authUser.email.split('@')[0],
-        };
-        console.log('Setting user data:', userData);
-        setUser(userData);
-        fetchUserProfile(authUser.uid, userData);
-      } else {
-        setUser(null);
-        setUserProfile(null);
+    const fetchMe = async () => {
+      try {
+        const res = await fetch('/api/auth/me');
+        const data = await res.json();
+        if (data.user) {
+          setUser(data.user);
+          setUserProfile(data.user);
+        }
+      } catch (err) {
+        console.error('Session check failed:', err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
+    };
+    fetchMe();
   }, []);
 
-  const login = async (email, password) => {
-    try {
-      const { user: authUser, error } = await signIn(email, password);
-      if (error) throw new Error(error);
-      const userData = {
-        id: authUser.uid,
-        email: authUser.email,
-        username: authUser.displayName || authUser.email.split('@')[0],
-      };
-      await fetchUserProfile(authUser.uid, userData);
-      return authUser;
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
-    }
+  const login = async (username, password) => {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Login failed');
+    setUser(data.user);
+    setUserProfile(data.user);
+    return data.user;
   };
 
-  const register = async (email, password) => {
-    try {
-      const { user: authUser, error } = await signUp(email, password);
-      if (error) throw new Error(error);
-      const userData = {
-        id: authUser.uid,
-        email: authUser.email,
-        username: authUser.displayName || authUser.email.split('@')[0],
-      };
-      await fetchUserProfile(authUser.uid, userData);
-      return authUser;
-    } catch (error) {
-      console.error('Error signing up:', error.code, error.message);
-      return { user: null, error: error.message };
-    }
-  };
-
-  const loginWithGoogle = async () => {
-    try {
-      const { user: authUser, error } = await signInWithGoogle();
-      if (error) throw new Error(error);
-      const userData = {
-        id: authUser.uid,
-        email: authUser.email,
-        username: authUser.displayName || authUser.email.split('@')[0],
-      };
-      await fetchUserProfile(authUser.uid, userData);
-      return authUser;
-    } catch (error) {
-      console.error('Google login error:', error);
-      throw error;
-    }
+  const register = async (username, password) => {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Registration failed');
+    setUser(data.user);
+    setUserProfile(data.user);
+    return data.user;
   };
 
   const logout = async () => {
-    try {
-      const { error } = await signOutUser();
-      if (error) throw new Error(error);
-      setUser(null);
-      setUserProfile(null);
-    } catch (error) {
-      console.error('Logout error:', error);
-      throw error;
-    }
+    await fetch('/api/auth/logout', { method: 'POST' });
+    setUser(null);
+    setUserProfile(null);
   };
 
-  // Update user profile
+  // Alias — some components call signOut()
+  const signOut = logout;
+
   const updateProfile = async (profileData) => {
     try {
-      if (!user) throw new Error('No authenticated user');
-
-      const userDocRef = doc(db, 'users', user.id);
-      await updateDoc(userDocRef, {
-        ...profileData,
-        updated_at: new Date().toISOString(),
+      const res = await fetch('/api/auth/me', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profileData),
       });
-
-      // Refresh the profile data
-      await fetchUserProfile(user.id, user);
-
+      const data = await res.json();
+      if (!res.ok) return { success: false, error: data.error };
+      setUser(data.user);
+      setUserProfile(data.user);
       return { success: true };
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      return { success: false, error: error.message };
+    } catch (err) {
+      return { success: false, error: err.message };
     }
   };
 
-  // The value that will be supplied to any consuming components
   const value = {
     user,
     userProfile,
     loading,
     login,
     register,
-    loginWithGoogle,
     logout,
+    signOut,
     updateProfile,
   };
-
-  console.log('Current auth state:', { user, userProfile, loading });
 
   return (
     <AuthContext.Provider value={value}>

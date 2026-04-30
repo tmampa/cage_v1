@@ -17,112 +17,37 @@ import {
 } from '@heroicons/react/24/solid';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../../../context/AuthContext';
-import FeedbackButton from '../../../../components/FeedbackButton';
+import { useChatbot } from '../../../../context/ChatbotContext';
+
+import HintSystem from '../../../../components/HintSystem';
+import AchievementNotification from '../../../../components/AchievementNotification';
+import { QuestionGenerationLoader, LevelLoadingSpinner } from '../../../../components/LoadingSpinner';
+import GameStats from '../../../../components/GameStats';
+import AnswerFeedback from '../../../../components/AnswerFeedback';
+import EnhancedQuestionCard from '../../../../components/EnhancedQuestionCard';
 import {
   generateQuestionsForLevel,
   getLevelDefinitions,
 } from '../../../../utils/generateQuestions';
-import { db } from '../../../../lib/firebase';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import {
+  checkAchievements, 
+  DEFAULT_USER_STATS 
+} from '../../../../utils/achievements';
 import React from 'react';
+import { extractQuestionContext, throttle } from '../../../../utils/chatbotContext';
+import { playCorrect, playWrong, playLevelComplete, playGameOver, playAchievement } from '../../../../utils/sounds';
+import BottomNav from '../../../../components/BottomNav';
 
-// Save level progress to Firebase
-const saveLevelProgress = async (userId, levelId, score, passed) => {
-  try {
-    const progressRef = doc(db, 'progress', `${userId}_${levelId}`);
-    const progressData = {
-      userId,
-      levelId,
-      score,
-      passed,
-      completedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    // Check if document exists
-    const docSnap = await getDoc(progressRef);
-    const isNewHighScore =
-      !docSnap.exists() || (docSnap.exists() && docSnap.data().score < score);
-
-    if (docSnap.exists()) {
-      // Only update if new score is higher
-      if (isNewHighScore) {
-        await updateDoc(progressRef, progressData);
-      }
-    } else {
-      // Create new document
-      await setDoc(progressRef, {
-        ...progressData,
-        createdAt: new Date().toISOString(),
-      });
-    }
-
-    // Update user's total score and highest level in their profile
-    const userRef = doc(db, 'users', userId);
-    const userDoc = await getDoc(userRef);
-
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-      let totalScore = userData.score || 0;
-      const currentHighestLevel = userData.highestLevel || 0;
-
-      // If this is a new high score for the level, update the total score
-      if (isNewHighScore) {
-        // If there was a previous score for this level, subtract it
-        if (docSnap.exists()) {
-          totalScore -= docSnap.data().score;
-        }
-        // Add the new score
-        totalScore += score;
-      }
-
-      // Update user profile with new total score and highest level if applicable
-      await updateDoc(userRef, {
-        score: totalScore,
-        highestLevel: passed
-          ? Math.max(currentHighestLevel, levelId)
-          : currentHighestLevel,
-        updatedAt: new Date().toISOString(),
-      });
-
-      // Update leaderboard
-      const leaderboardRef = doc(db, 'leaderboard', userId);
-      await setDoc(
-        leaderboardRef,
-        {
-          userId,
-          username: userData.username,
-          score: totalScore,
-          avatar_emoji: userData.avatar_emoji || '👤',
-          updatedAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Error saving progress:', error);
-    throw error;
-  }
+// Difficulty-based scoring and timer configuration
+const DIFFICULTY_CONFIG = {
+  Easy:   { basePoints: 100, timeBonus: 20, timer: 60 },
+  Medium: { basePoints: 150, timeBonus: 30, timer: 45 },
+  Hard:   { basePoints: 200, timeBonus: 40, timer: 30 },
 };
 
-// Get level progress from Firebase
-const getLevelProgress = async (userId, levelId) => {
-  try {
-    const progressRef = doc(db, 'progress', `${userId}_${levelId}`);
-    const docSnap = await getDoc(progressRef);
-
-    if (docSnap.exists()) {
-      return docSnap.data();
-    }
-
-    return null;
-  } catch (error) {
-    console.error('Error getting progress:', error);
-    throw error;
-  }
-};
+function getDifficultyConfig(difficulty) {
+  return DIFFICULTY_CONFIG[difficulty] || DIFFICULTY_CONFIG.Easy;
+}
 
 export default function GameplayPage({ params }) {
   const router = useRouter();
@@ -142,15 +67,37 @@ export default function GameplayPage({ params }) {
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(3);
   const [timeLeft, setTimeLeft] = useState(60);
+  
+  // New enhancement states
+  const [hintsRemaining, setHintsRemaining] = useState(3);
+  const [currentStreak, setCurrentStreak] = useState(0);
+  const [maxStreak, setMaxStreak] = useState(0);
+  const [questionStartTime, setQuestionStartTime] = useState(null);
+  const [fastestAnswer, setFastestAnswer] = useState(Infinity);
+  const [newAchievement, setNewAchievement] = useState(null);
+  const [userStats, setUserStats] = useState(DEFAULT_USER_STATS);
+  const [userAchievements, setUserAchievements] = useState([]);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [showExplanation, setShowExplanation] = useState(false);
   const [gameOver, setGameOver] = useState(false);
   const [levelComplete, setLevelComplete] = useState(false);
   const [isAnswerCorrect, setIsAnswerCorrect] = useState(null);
   const [generatingQuestions, setGeneratingQuestions] = useState(true);
+  const [answeredQuestions, setAnsweredQuestions] = useState([]); // Track answers for review
+  const [showReview, setShowReview] = useState(false); // Post-level review toggle
 
   // Ref for the timer
   const timerRef = React.useRef(null);
+
+  // Ref to keep latest userStats accessible in closures (avoids stale state)
+  const userStatsRef = React.useRef(userStats);
+  React.useEffect(() => { userStatsRef.current = userStats; }, [userStats]);
+
+  useEffect(() => {
+    if (user?.isAdmin) {
+      router.replace('/admin');
+    }
+  }, [user?.isAdmin, router]);
 
   // Animation variants
   const containerVariants = {
@@ -179,6 +126,11 @@ export default function GameplayPage({ params }) {
   useEffect(() => {
     const loadLevelAndQuestions = async () => {
       try {
+        if (user?.isAdmin) {
+          setLoading(false);
+          return;
+        }
+
         setLoading(true);
         setError(null);
 
@@ -194,10 +146,18 @@ export default function GameplayPage({ params }) {
 
         setLevel(currentLevel);
 
-        // Check for existing progress
-        let userProgress = null;
+        // Save this as the last played level
         if (user?.id) {
-          userProgress = await getLevelProgress(user.id, levelId);
+          localStorage.setItem(`lastPlayedLevel_${user.id}`, levelId.toString());
+        }
+
+        // Check for existing progress
+        if (user?.id) {
+          const res = await fetch('/api/progress');
+          const data = await res.json();
+          const allProgress = data.progress || [];
+          const levelProgress = allProgress.find(p => p.levelId === levelId);
+          // levelProgress available if needed
         }
 
         // Generate new questions or load existing ones
@@ -225,9 +185,29 @@ export default function GameplayPage({ params }) {
         setGeneratingQuestions(false);
         setShowExplanation(false);
         setSelectedAnswer(null);
-        setTimeLeft(60);
+        setAnsweredQuestions([]);
+        setShowReview(false);
+        // Set timer based on level difficulty
+        const diffConfig = getDifficultyConfig(currentLevel.difficulty);
+        setTimeLeft(diffConfig.timer);
         setGameOver(false);
         setLevelComplete(false);
+        
+        // Initialize enhancement states
+        setHintsRemaining(3);
+        setCurrentStreak(0);
+        setMaxStreak(0);
+        setFastestAnswer(Infinity);
+        setQuestionStartTime(Date.now());
+
+        // Load user stats and achievements from localStorage
+        if (user?.id) {
+          const savedAchievements = localStorage.getItem(`achievements_${user.id}`);
+          if (savedAchievements) {
+            setUserAchievements(JSON.parse(savedAchievements));
+          }
+          setUserStats({ ...DEFAULT_USER_STATS });
+        }
       } catch (error) {
         console.error('Error loading level:', error);
         setError(`Failed to load level: ${error.message}`);
@@ -242,7 +222,7 @@ export default function GameplayPage({ params }) {
     return () => {
       clearTimeout(timerRef.current);
     };
-  }, [levelId, user?.id]);
+  }, [levelId, user?.id, user?.isAdmin]);
 
   // Handle level complete
   const completedLevel = async () => {
@@ -250,22 +230,68 @@ export default function GameplayPage({ params }) {
     clearTimeout(timerRef.current);
 
     // Calculate results
-    const correctAnswers = Math.floor(score / 100);
     const totalQuestions = questions.length;
+    const correctAnswers = answeredQuestions.filter(q => q.isCorrect).length;
     const passThreshold = Math.floor(totalQuestions * 0.6); // 60% correct to pass
     const passed = correctAnswers >= passThreshold;
+    const isPerfectScore = correctAnswers === totalQuestions;
+
+    // Check if this level was previously failed (for comeback achievement)
+    let isComeback = false;
+    if (passed && user?.id) {
+      try {
+        const res = await fetch('/api/progress');
+        const data = await res.json();
+        const prev = (data.progress || []).find(p => p.levelId === levelId);
+        if (prev && !prev.completed) isComeback = true;
+      } catch {}
+    }
 
     setLevelComplete(true);
+    playLevelComplete();
 
-    // Save progress to Firebase
+    // Build final stats from the ref (latest state) to avoid stale closure
+    const latestStats = userStatsRef.current;
+    const sessionCorrect = answeredQuestions.filter(q => q.isCorrect).length;
+    const sessionTotal = answeredQuestions.length;
+    const finalStats = {
+      ...latestStats,
+      correctAnswers: (latestStats.correctAnswers || 0) + sessionCorrect,
+      totalAnswers: (latestStats.totalAnswers || 0) + sessionTotal,
+      maxStreak: Math.max(latestStats.maxStreak || 0, maxStreak),
+      fastestAnswer: Math.min(latestStats.fastestAnswer || Infinity, fastestAnswer),
+      levelsCompleted: passed ? (latestStats.levelsCompleted || 0) + 1 : (latestStats.levelsCompleted || 0),
+      perfectScores: isPerfectScore ? (latestStats.perfectScores || 0) + 1 : (latestStats.perfectScores || 0),
+      noHintLevels: hintsRemaining === 3 && passed ? (latestStats.noHintLevels || 0) + 1 : (latestStats.noHintLevels || 0),
+      comebacks: isComeback ? (latestStats.comebacks || 0) + 1 : (latestStats.comebacks || 0),
+    };
+
+    // Update the user stats state
+    setUserStats(finalStats);
+
+    // Save achievements to localStorage
     if (user?.id) {
       try {
-        await saveLevelProgress(user.id, levelId, score, passed);
+        const newAchievements = checkAchievements(finalStats, userAchievements);
+        if (newAchievements.length > 0) {
+          playAchievement();
+          setNewAchievement(newAchievements[0]);
+          const allAchievements = [...userAchievements, ...newAchievements];
+          setUserAchievements(allAchievements);
+          localStorage.setItem(`achievements_${user.id}`, JSON.stringify(allAchievements));
+        }
+      } catch (error) {
+        console.error('Error checking achievements:', error);
+      }
 
-        // If this level was completed successfully, we'll unlock the next level
-        // (handled in the saveLevelProgress function)
-
-        console.log(`Progress saved for level ${levelId}`);
+      // Save progress to API
+      try {
+        await fetch('/api/progress', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ levelId, score, completed: passed }),
+        });
+        if (passed) localStorage.removeItem(`lastPlayedLevel_${user.id}`);
       } catch (error) {
         console.error('Error saving progress:', error);
       }
@@ -274,6 +300,42 @@ export default function GameplayPage({ params }) {
 
   // Current question
   const currentQuestion = questions[currentQuestionIndex];
+
+  // Reset question timing when question changes
+  useEffect(() => {
+    if (currentQuestion && !showExplanation) {
+      setQuestionStartTime(Date.now());
+    }
+  }, [currentQuestionIndex, currentQuestion, showExplanation]);
+
+  // Update chatbot context when question changes (throttled)
+  useEffect(() => {
+    if (!loading && !generatingQuestions && currentQuestion && level) {
+      const updateContext = throttle(() => {
+        const context = extractQuestionContext(
+          level,
+          currentQuestion,
+          currentQuestionIndex,
+          questions.length,
+          score,
+          lives,
+          userProfile
+        );
+      }, 1000); // Throttle to max 1 update per second
+
+      updateContext();
+    }
+  }, [
+    currentQuestion,
+    currentQuestionIndex,
+    level,
+    questions.length,
+    score,
+    lives,
+    userProfile,
+    loading,
+    generatingQuestions,
+  ]);
 
   // Timer effect
   useEffect(() => {
@@ -320,31 +382,117 @@ export default function GameplayPage({ params }) {
     setShowExplanation(true);
   };
 
+
+
+  // Handle hint usage
+  const handleHintUsed = () => {
+    setHintsRemaining(prev => Math.max(0, prev - 1));
+    setUserStats(prev => ({
+      ...prev,
+      hintsUsed: prev.hintsUsed + 1
+    }));
+  };
+
   // Handle answer selection
   const handleAnswerSelect = (answerIndex) => {
     if (selectedAnswer !== null || showExplanation || !currentQuestion) return;
 
     setSelectedAnswer(answerIndex);
 
-    const correctAnswerIndex =
-      currentQuestion.correctIndex !== undefined
-        ? currentQuestion.correctIndex
-        : currentQuestion.correctAnswer;
+    // Calculate answer time for speed tracking
+    const answerTime = questionStartTime ? (Date.now() - questionStartTime) / 1000 : 60;
 
-    if (answerIndex === correctAnswerIndex) {
-      // Correct answer
-      setScore((prevScore) => prevScore + 100);
-      setIsAnswerCorrect(true);
+    const correctAnswerIndex = currentQuestion.correctIndex !== undefined
+      ? currentQuestion.correctIndex
+      : currentQuestion.correctAnswer;
+
+    const isCorrect = answerIndex === correctAnswerIndex;
+    setIsAnswerCorrect(isCorrect);
+
+    // Get difficulty-based scoring config
+    const diffConfig = getDifficultyConfig(level?.difficulty);
+
+    // Track this answer for post-level review
+    setAnsweredQuestions(prev => [...prev, {
+      question: currentQuestion.question,
+      options: currentQuestion.options,
+      selectedIndex: answerIndex,
+      correctIndex: correctAnswerIndex,
+      isCorrect,
+      explanation: currentQuestion.explanation,
+      hint: currentQuestion.hint,
+    }]);
+
+    if (isCorrect) {
+      playCorrect();
+      // Calculate points: base + time bonus for fast answers
+      const timeBonus = timeLeft > (diffConfig.timer * 0.5) ? diffConfig.timeBonus : 0;
+      const pointsEarned = diffConfig.basePoints + timeBonus;
+      setScore(prevScore => prevScore + pointsEarned);
+      
+      // Update streak
+      setCurrentStreak(prev => {
+        const newStreak = prev + 1;
+        setMaxStreak(current => Math.max(current, newStreak));
+        return newStreak;
+      });
+      
+      // Track fastest answer
+      setFastestAnswer(prev => Math.min(prev, answerTime));
+      
+      // Check for mid-game achievements using session data
+      try {
+        const sessionCorrectSoFar = answeredQuestions.filter(q => q.isCorrect).length + 1;
+        const sessionTotalSoFar = answeredQuestions.length + 1;
+        const midGameStats = {
+          ...userStatsRef.current,
+          correctAnswers: (userStatsRef.current.correctAnswers || 0) + sessionCorrectSoFar,
+          totalAnswers: (userStatsRef.current.totalAnswers || 0) + sessionTotalSoFar,
+          maxStreak: Math.max(userStatsRef.current.maxStreak || 0, currentStreak + 1),
+        };
+        const newAchievements = checkAchievements(midGameStats, userAchievements);
+        if (newAchievements.length > 0) {
+          const allAch = [...userAchievements, ...newAchievements];
+          setNewAchievement(newAchievements[0]);
+          setUserAchievements(allAch);
+          if (user?.id) localStorage.setItem(`achievements_${user.id}`, JSON.stringify(allAch));
+        }
+      } catch (error) {
+        console.error('Error checking achievements during gameplay:', error);
+      }
+      
     } else {
+      playWrong();
       // Wrong answer
-      setLives((prevLives) => {
+      setLives(prevLives => {
         const newLives = prevLives - 1;
         if (newLives <= 0) {
+          playGameOver();
           setGameOver(true);
         }
         return newLives;
       });
-      setIsAnswerCorrect(false);
+      
+      // Reset streak on wrong answer
+      setCurrentStreak(0);
+      
+      // Check for mid-game achievements (e.g. "Brave Beginner" for first attempt)
+      try {
+        const sessionTotalSoFar = answeredQuestions.length + 1;
+        const midGameStats = {
+          ...userStatsRef.current,
+          totalAnswers: (userStatsRef.current.totalAnswers || 0) + sessionTotalSoFar,
+        };
+        const newAchievements = checkAchievements(midGameStats, userAchievements);
+        if (newAchievements.length > 0) {
+          const allAch = [...userAchievements, ...newAchievements];
+          setNewAchievement(newAchievements[0]);
+          setUserAchievements(allAch);
+          if (user?.id) localStorage.setItem(`achievements_${user.id}`, JSON.stringify(allAch));
+        }
+      } catch (error) {
+        console.error('Error checking achievements during gameplay:', error);
+      }
     }
 
     setShowExplanation(true);
@@ -356,8 +504,12 @@ export default function GameplayPage({ params }) {
       setCurrentQuestionIndex((prevIndex) => prevIndex + 1);
       setSelectedAnswer(null);
       setShowExplanation(false);
-      setTimeLeft(60);
+      const diffConfig = getDifficultyConfig(level?.difficulty);
+      setTimeLeft(diffConfig.timer);
       setIsAnswerCorrect(null);
+      
+      // Reset question timing for next question
+      setQuestionStartTime(Date.now());
     } else {
       // Level completed - save progress
       completedLevel();
@@ -384,25 +536,7 @@ export default function GameplayPage({ params }) {
 
   // If still loading or generating questions
   if (loading || generatingQuestions) {
-    return (
-      <div className='min-h-screen bg-gradient-to-b from-blue-300 to-purple-300 text-blue-900 flex flex-col items-center justify-center p-4'>
-        <div className='game-card p-8 text-center max-w-lg w-full'>
-          <div className='flex justify-center mb-4'>
-            <div className='animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-600'></div>
-          </div>
-          <h2 className='text-xl font-bold text-purple-700 mb-3'>
-            {generatingQuestions
-              ? 'Generating Questions...'
-              : 'Loading Level...'}
-          </h2>
-          <p className='text-blue-700'>
-            {generatingQuestions
-              ? 'Our AI is creating challenging cyber security questions just for you!'
-              : 'Getting everything ready for your cyber adventure!'}
-          </p>
-        </div>
-      </div>
-    );
+    return generatingQuestions ? <QuestionGenerationLoader /> : <LevelLoadingSpinner />;
   }
 
   // If there was an error
@@ -433,7 +567,7 @@ export default function GameplayPage({ params }) {
             No Questions Available
           </h2>
           <p className='text-blue-700 mb-6'>
-            We couldn't generate questions for this level. Fallback questions have been removed from the system.
+            We couldn&apos;t generate questions for this level. Fallback questions have been removed from the system.
           </p>
           <Link href='/game/levels'>
             <button className='btn-primary'>Back to Levels</button>
@@ -475,7 +609,7 @@ export default function GameplayPage({ params }) {
             </div>
 
             <p className='mb-6 text-blue-700'>
-              Don't worry! Learning about cyber security takes practice. Try
+              Don&apos;t worry! Learning about cyber security takes practice. Try
               again!
             </p>
 
@@ -494,37 +628,7 @@ export default function GameplayPage({ params }) {
         </div>
 
         {/* Bottom Tabs Navigation Bar */}
-        <div className='fixed bottom-0 left-0 right-0 bg-white shadow-lg z-30'>
-          <div className='flex justify-around items-center'>
-            <Link href='/game/levels' className='flex-1'>
-              <div className='flex flex-col items-center py-3 text-blue-600'>
-                <HomeIcon className='w-6 h-6' />
-                <span className='text-xs mt-1'>Home</span>
-              </div>
-            </Link>
-
-            <Link href='/game/levels' className='flex-1'>
-              <div className='flex flex-col items-center py-3 text-purple-600 border-t-2 border-purple-600'>
-                <PuzzlePieceIcon className='w-6 h-6' />
-                <span className='text-xs mt-1'>Levels</span>
-              </div>
-            </Link>
-
-            <Link href='/leaderboard' className='flex-1'>
-              <div className='flex flex-col items-center py-3 text-blue-600'>
-                <TrophyIcon className='w-6 h-6' />
-                <span className='text-xs mt-1'>Leaderboard</span>
-              </div>
-            </Link>
-
-            <Link href='/profile' className='flex-1'>
-              <div className='flex flex-col items-center py-3 text-blue-600'>
-                <UserIcon className='w-6 h-6' />
-                <span className='text-xs mt-1'>Profile</span>
-              </div>
-            </Link>
-          </div>
-        </div>
+        <BottomNav activeTab="levels" />
       </div>
     );
   }
@@ -532,9 +636,18 @@ export default function GameplayPage({ params }) {
   // Level complete screen
   if (levelComplete) {
     const totalQuestions = questions.length;
-    const correctAnswers = Math.floor(score / 100);
+    const correctAnswers = answeredQuestions.filter(q => q.isCorrect).length;
     const passThreshold = Math.floor(totalQuestions * 0.6);
     const passed = correctAnswers >= passThreshold;
+    const accuracy = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
+    const isPerfect = correctAnswers === totalQuestions;
+
+    // Star rating: 1 star = passed, 2 stars = 80%+, 3 stars = perfect
+    const starCount = isPerfect ? 3 : accuracy >= 80 ? 2 : passed ? 1 : 0;
+
+    // Check if there's a next level
+    const allLevels = getLevelDefinitions();
+    const nextLevel = allLevels.find(l => l.id === levelId + 1);
 
     return (
       <div className='min-h-screen bg-gradient-to-b from-blue-300 to-purple-300 text-blue-900 pb-20 relative'>
@@ -545,289 +658,231 @@ export default function GameplayPage({ params }) {
             transition={{ duration: 0.5 }}
             className='game-card p-6 max-w-lg mx-auto text-center'
           >
-            <h2 className='text-2xl font-bold mb-4 text-purple-700'>
+            <h2 className='text-2xl font-bold mb-2 text-purple-700'>
               {passed ? 'Mission Complete! 🎉' : 'Mission Incomplete 😢'}
             </h2>
 
-            <div className='mb-6 bg-blue-50 rounded-lg p-4'>
-              <h3 className='font-bold text-blue-700 mb-3'>Level Results</h3>
-              <div className='flex justify-between mb-2'>
-                <span className='text-blue-600'>Score:</span>
-                <span className='font-bold text-purple-700'>
-                  {score} points
-                </span>
-              </div>
-              <div className='flex justify-between mb-2'>
-                <span className='text-blue-600'>Correct Answers:</span>
-                <span className='font-bold text-purple-700'>
-                  {correctAnswers} / {totalQuestions}
-                </span>
-              </div>
-              <div className='flex justify-between'>
-                <span className='text-blue-600'>Status:</span>
-                <span
-                  className={`font-bold ${
-                    passed ? 'text-green-600' : 'text-red-600'
-                  }`}
+            {/* Star Rating */}
+            <div className='flex justify-center gap-1 mb-4'>
+              {[1, 2, 3].map(star => (
+                <motion.div
+                  key={star}
+                  initial={{ scale: 0, rotate: -180 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ delay: 0.3 + star * 0.2, type: 'spring', stiffness: 200 }}
                 >
-                  {passed ? 'PASSED' : 'FAILED'}
-                </span>
+                  <StarIcon
+                    className={`w-10 h-10 ${star <= starCount ? 'text-yellow-400' : 'text-gray-300'}`}
+                  />
+                </motion.div>
+              ))}
+            </div>
+
+            <div className='mb-4 bg-blue-50 rounded-lg p-4'>
+              <h3 className='font-bold text-blue-700 mb-3'>Level Results</h3>
+              <div className='grid grid-cols-2 gap-3 text-sm'>
+                <div className='bg-white rounded-lg p-2'>
+                  <div className='text-blue-500'>Score</div>
+                  <div className='font-bold text-purple-700 text-lg'>{score}</div>
+                </div>
+                <div className='bg-white rounded-lg p-2'>
+                  <div className='text-blue-500'>Accuracy</div>
+                  <div className='font-bold text-purple-700 text-lg'>{accuracy}%</div>
+                </div>
+                <div className='bg-white rounded-lg p-2'>
+                  <div className='text-blue-500'>Correct</div>
+                  <div className='font-bold text-purple-700 text-lg'>{correctAnswers}/{totalQuestions}</div>
+                </div>
+                <div className='bg-white rounded-lg p-2'>
+                  <div className='text-blue-500'>Best Streak</div>
+                  <div className='font-bold text-purple-700 text-lg'>{maxStreak}🔥</div>
+                </div>
               </div>
             </div>
 
-            <p className='mb-6 text-blue-700'>
+            {/* Question Review Toggle */}
+            {answeredQuestions.length > 0 && (
+              <button
+                onClick={() => setShowReview(!showReview)}
+                className='mb-4 text-sm font-medium text-blue-600 hover:text-blue-800 underline'
+              >
+                {showReview ? 'Hide Question Review' : `Review All Questions (${answeredQuestions.length})`}
+              </button>
+            )}
+
+            {/* Expandable Question Review */}
+            <AnimatePresence>
+              {showReview && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className='mb-4 text-left space-y-3 max-h-80 overflow-y-auto'
+                >
+                  {answeredQuestions.map((aq, idx) => (
+                    <div
+                      key={idx}
+                      className={`p-3 rounded-lg border-2 text-sm ${
+                        aq.isCorrect
+                          ? 'bg-green-50 border-green-200'
+                          : 'bg-red-50 border-red-200'
+                      }`}
+                    >
+                      <div className='font-medium mb-1'>
+                        {aq.isCorrect ? '✅' : '❌'} Q{idx + 1}: {aq.question}
+                      </div>
+                      {!aq.isCorrect && (
+                        <div className='text-xs space-y-1'>
+                          <div className='text-red-600'>
+                            Your answer: {aq.options[aq.selectedIndex]}
+                          </div>
+                          <div className='text-green-600'>
+                            Correct: {aq.options[aq.correctIndex]}
+                          </div>
+                        </div>
+                      )}
+                      {aq.explanation && (
+                        <div className='text-xs text-gray-600 mt-1 italic'>
+                          {aq.explanation}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <p className='mb-4 text-blue-700 text-sm'>
               {passed
-                ? "Great job protecting yourself online! You've earned cyber security points!"
+                ? isPerfect
+                  ? "Perfect score! You're a cybersecurity expert! 🏆"
+                  : "Great job protecting yourself online! You've earned cyber security points!"
                 : "Don't worry! Learning about cyber security takes practice. Try again!"}
             </p>
 
-            <div className='flex flex-col sm:flex-row gap-3 justify-center'>
-              <button
-                onClick={() => window.location.reload()}
-                className='btn-primary w-full'
-              >
-                Play Again
-              </button>
-              <Link href='/game/levels'>
-                <button className='btn-secondary w-full'>Back to Levels</button>
-              </Link>
+            <div className='flex flex-col gap-3'>
+              {passed && nextLevel && (
+                <Link href={`/game/play/${nextLevel.id}`}>
+                  <button className='btn-primary w-full text-lg py-3'>
+                    Next Level: {nextLevel.title} →
+                  </button>
+                </Link>
+              )}
+              <div className='flex gap-3'>
+                <button
+                  onClick={() => window.location.reload()}
+                  className={`${passed && nextLevel ? 'btn-secondary' : 'btn-primary'} flex-1`}
+                >
+                  Play Again
+                </button>
+                <Link href='/game/levels' className='flex-1'>
+                  <button className='btn-secondary w-full'>Back to Levels</button>
+                </Link>
+              </div>
             </div>
           </motion.div>
         </div>
 
         {/* Bottom Tabs Navigation Bar */}
-        <div className='fixed bottom-0 left-0 right-0 bg-white shadow-lg z-30'>
-          <div className='flex justify-around items-center'>
-            <Link href='/' className='flex-1'>
-              <div className='flex flex-col items-center py-3 text-blue-600'>
-                <HomeIcon className='w-6 h-6' />
-                <span className='text-xs mt-1'>Home</span>
-              </div>
-            </Link>
-
-            <Link href='/game/levels' className='flex-1'>
-              <div className='flex flex-col items-center py-3 text-purple-600 border-t-2 border-purple-600'>
-                <PuzzlePieceIcon className='w-6 h-6' />
-                <span className='text-xs mt-1'>Levels</span>
-              </div>
-            </Link>
-
-            <Link href='/leaderboard' className='flex-1'>
-              <div className='flex flex-col items-center py-3 text-blue-600'>
-                <TrophyIcon className='w-6 h-6' />
-                <span className='text-xs mt-1'>Leaderboard</span>
-              </div>
-            </Link>
-
-            <Link href='/profile' className='flex-1'>
-              <div className='flex flex-col items-center py-3 text-blue-600'>
-                <UserIcon className='w-6 h-6' />
-                <span className='text-xs mt-1'>Profile</span>
-              </div>
-            </Link>
-          </div>
-        </div>
+        <BottomNav activeTab="levels" />
       </div>
     );
   }
 
   return (
     <div className='min-h-screen bg-gradient-to-b from-blue-300 to-purple-300 text-blue-900 pb-20 relative'>
+      {/* Achievement Notification */}
+      {newAchievement && (
+        <AchievementNotification
+          achievement={newAchievement}
+          onClose={() => setNewAchievement(null)}
+        />
+      )}
+      
       {/* Decorative bubbles */}
       <div className='bubble w-20 h-20 top-20 left-10'></div>
       <div className='bubble w-16 h-16 top-40 right-10'></div>
       <div className='bubble w-24 h-24 bottom-20 left-1/3'></div>
       <div className='bubble w-12 h-12 top-1/3 right-20'></div>
 
-      {/* Header with back button and game info */}
+      {/* Header with back button */}
       <div className='container mx-auto p-4 pb-24'>
         <div className='flex justify-between items-center mb-4'>
-          <Link href='/game/levels' className='flex items-center text-blue-700'>
+          <Link href='/game/levels' className='flex items-center text-blue-700 hover:text-blue-900 transition-colors'>
             <ArrowLeftIcon className='w-5 h-5 mr-1' />
-            <span>Exit Level</span>
+            <span className="font-medium">Exit Level</span>
           </Link>
-          <div className='flex items-center gap-3'>
-            <div className='flex items-center'>
-              <StarIcon className='w-5 h-5 text-yellow-500 mr-1' />
-              <span className='font-bold'>{score}</span>
-            </div>
-            <div className='flex items-center'>{renderLives()}</div>
+          <div className="text-center">
+            <h2 className="text-lg font-bold text-purple-700">
+              Level {levelId}: {level?.title}
+            </h2>
           </div>
+          <div className="w-20"></div> {/* Spacer for centering */}
         </div>
 
-        {/* Progress bar */}
-        <div className='mb-4'>
-          <div className='flex justify-between text-sm mb-1'>
-            <span>
-              Level {levelId}: {level && level.title}
-            </span>
-            <span>
-              Question {currentQuestionIndex + 1}/{questions.length}
-            </span>
-          </div>
-          <div className='h-3 bg-blue-100 rounded-full overflow-hidden'>
-            <div
-              className='h-full bg-blue-500 rounded-full transition-all duration-300'
-              style={{ width: `${progressPercentage}%` }}
-            ></div>
-          </div>
+        {/* Enhanced Game Stats */}
+        <div className='mb-6'>
+          <GameStats
+            score={score}
+            lives={lives}
+            maxLives={3}
+            timeLeft={timeLeft}
+            hintsRemaining={hintsRemaining}
+            streak={currentStreak}
+            questionNumber={currentQuestionIndex + 1}
+            totalQuestions={questions.length}
+            compact={true}
+          />
         </div>
 
-        {/* Timer */}
-        <div className='mb-4 flex justify-end'>
-          <div
-            className={`flex items-center py-1 px-3 rounded-full ${
-              timeLeft <= 5
-                ? 'bg-red-100 text-red-700 animate-pulse'
-                : 'bg-blue-100 text-blue-700'
-            }`}
-          >
-            <ClockIcon className='w-5 h-5' />
-            <span className='font-bold'>{timeLeft}s</span>
-          </div>
-        </div>
-
-        {/* Question card */}
+        {/* Enhanced Question Card */}
         <AnimatePresence mode='wait'>
-          <motion.div
-            key={`question-${currentQuestionIndex}`}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className='game-card p-5 mb-4'
-          >
-            <h3 className='text-xl font-bold mb-4 text-blue-800'>
-              {currentQuestion?.question}
-            </h3>
+          <div key={`question-${currentQuestionIndex}`}>
+            <EnhancedQuestionCard
+              question={currentQuestion?.question}
+              options={currentQuestion?.options || []}
+              selectedAnswer={selectedAnswer}
+              correctAnswer={
+                currentQuestion?.correctIndex !== undefined
+                  ? currentQuestion.correctIndex
+                  : currentQuestion?.correctAnswer
+              }
+              showExplanation={showExplanation}
+              onAnswerSelect={handleAnswerSelect}
+              disabled={showExplanation}
+              questionNumber={currentQuestionIndex + 1}
+              totalQuestions={questions.length}
+            />
 
-            {/* Answer options */}
-            <motion.div
-              variants={containerVariants}
-              initial='hidden'
-              animate='visible'
-              className='space-y-3'
-            >
-              {currentQuestion.options.map((option, index) => {
-                const correctAnswerIndex =
-                  currentQuestion.correctIndex !== undefined
-                    ? currentQuestion.correctIndex
-                    : currentQuestion.correctAnswer;
-
-                return (
-                  <motion.button
-                    key={`option-${index}`}
-                    variants={itemVariants}
-                    onClick={() => handleAnswerSelect(index)}
-                    disabled={showExplanation}
-                    className={`w-full p-3 rounded-lg text-left transition-colors ${
-                      showExplanation
-                        ? index === correctAnswerIndex
-                          ? 'bg-green-100 border-2 border-green-500 text-green-800'
-                          : index === selectedAnswer
-                          ? 'bg-red-100 border-2 border-red-500 text-red-800'
-                          : 'bg-white text-blue-700 border border-gray-200'
-                        : selectedAnswer === index
-                        ? 'bg-blue-100 border-2 border-blue-500 text-blue-700'
-                        : 'bg-white hover:bg-blue-50 text-blue-700 border border-gray-200'
-                    }`}
-                  >
-                    <div className='flex items-center'>
-                      <div
-                        className={`w-6 h-6 rounded-full mr-3 flex items-center justify-center ${
-                          showExplanation
-                            ? index === correctAnswerIndex
-                              ? 'bg-green-500 text-white'
-                              : index === selectedAnswer
-                              ? 'bg-red-500 text-white'
-                              : 'bg-gray-200 text-gray-700'
-                            : 'bg-blue-100 text-blue-700'
-                        }`}
-                      >
-                        {['A', 'B', 'C', 'D'][index]}
-                      </div>
-                      <span>{option}</span>
-                    </div>
-                  </motion.button>
-                );
-              })}
-            </motion.div>
-
-            {/* Answer explanation */}
-            {showExplanation && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className='mt-4 p-3 rounded-lg bg-blue-50'
-              >
-                <div className='flex items-start'>
-                  {isAnswerCorrect ? (
-                    <CheckCircleIcon className='w-5 h-5 text-green-500 mr-2 flex-shrink-0 mt-0.5' />
-                  ) : (
-                    <XCircleIcon className='w-5 h-5 text-red-500 mr-2 flex-shrink-0 mt-0.5' />
-                  )}
-                  <div>
-                    <h4
-                      className={`font-bold mb-1 ${
-                        isAnswerCorrect ? 'text-green-700' : 'text-red-700'
-                      }`}
-                    >
-                      {isAnswerCorrect ? 'Correct!' : 'Incorrect!'}
-                    </h4>
-                    <p className='text-sm text-blue-700'>
-                      {currentQuestion.explanation}
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleNextQuestion}
-                  className='mt-3 w-full py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors'
-                >
-                  {currentQuestionIndex < questions.length - 1
-                    ? 'Next Question'
-                    : 'Complete Level'}
-                </button>
-              </motion.div>
+            {/* Hint System */}
+            {!showExplanation && (
+              <div className="mt-4">
+                <HintSystem
+                  question={currentQuestion}
+                  onHintUsed={handleHintUsed}
+                  hintsRemaining={hintsRemaining}
+                  disabled={showExplanation || selectedAnswer !== null}
+                />
+              </div>
             )}
-          </motion.div>
+
+            {/* Enhanced Answer Feedback */}
+            <AnswerFeedback
+              isCorrect={isAnswerCorrect}
+              explanation={currentQuestion?.explanation}
+              streak={currentStreak}
+              points={isAnswerCorrect ? getDifficultyConfig(level?.difficulty).basePoints + (timeLeft > getDifficultyConfig(level?.difficulty).timer * 0.5 ? getDifficultyConfig(level?.difficulty).timeBonus : 0) : 0}
+              isVisible={showExplanation}
+              onNext={handleNextQuestion}
+            />
+          </div>
         </AnimatePresence>
       </div>
 
       {/* Bottom Tabs Navigation Bar */}
-      <div className='fixed bottom-0 left-0 right-0 bg-white shadow-lg z-30'>
-        <div className='flex justify-around items-center'>
-          <Link href='/' className='flex-1'>
-            <div className='flex flex-col items-center py-3 text-blue-600'>
-              <HomeIcon className='w-6 h-6' />
-              <span className='text-xs mt-1'>Home</span>
-            </div>
-          </Link>
+      <BottomNav activeTab="levels" />
 
-          <Link href='/game/levels' className='flex-1'>
-            <div className='flex flex-col items-center py-3 text-purple-600 border-t-2 border-purple-600'>
-              <PuzzlePieceIcon className='w-6 h-6' />
-              <span className='text-xs mt-1'>Levels</span>
-            </div>
-          </Link>
 
-          <Link href='/leaderboard' className='flex-1'>
-            <div className='flex flex-col items-center py-3 text-blue-600'>
-              <TrophyIcon className='w-6 h-6' />
-              <span className='text-xs mt-1'>Leaderboard</span>
-            </div>
-          </Link>
-
-          <Link href='/profile' className='flex-1'>
-            <div className='flex flex-col items-center py-3 text-blue-600'>
-              <UserIcon className='w-6 h-6' />
-              <span className='text-xs mt-1'>Profile</span>
-            </div>
-          </Link>
-        </div>
-      </div>
-
-      {/* Feedback Button */}
-      <FeedbackButton />
     </div>
   );
 }
