@@ -15,7 +15,6 @@ import {
 } from '../../../../components/admin/AdminLayout';
 import { adminFetch } from '../../../../lib/adminFetch';
 import {
-  ChatBubbleLeftRightIcon,
   ClipboardDocumentCheckIcon,
   EnvelopeIcon,
   TrophyIcon,
@@ -55,7 +54,7 @@ function UserDetailContent() {
 
   if (loading) {
     return (
-      <AdminShell title="User Detail" description="Inspect player progress, submitted feedback, and chat history.">
+        <AdminShell title="User Detail" description="Inspect player progress and submitted feedback.">
         <AdminLoading label="Loading user detail..." />
       </AdminShell>
     );
@@ -63,13 +62,13 @@ function UserDetailContent() {
 
   if (error) {
     return (
-      <AdminShell title="User Detail" description="Inspect player progress, submitted feedback, and chat history.">
+      <AdminShell title="User Detail" description="Inspect player progress and submitted feedback.">
         <AdminError message={error} />
       </AdminShell>
     );
   }
 
-  const { user, levelProgress, unlockedLevels, feedback, chatSessions } = data;
+  const { user, levelProgress, unlockedLevels, feedback } = data;
   const completedLevels = levelProgress.filter((progress) => progress.completed).length;
 
   return (
@@ -102,11 +101,10 @@ function UserDetailContent() {
           </div>
         </AdminPanel>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <AdminStatCard label="Score" value={user.score || 0} icon={TrophyIcon} tone="amber" />
           <AdminStatCard label="Completed Levels" value={`${completedLevels}/6`} icon={ClipboardDocumentCheckIcon} tone="green" />
           <AdminStatCard label="Feedback" value={feedback.length} icon={EnvelopeIcon} tone="blue" />
-          <AdminStatCard label="Chat Sessions" value={chatSessions.length} icon={ChatBubbleLeftRightIcon} tone="slate" />
         </div>
 
         <AdminPanel title="Level Progress" description="Current progress for each learning level.">
@@ -157,51 +155,6 @@ function UserDetailContent() {
                     <AdminBadge tone={item.resolved ? 'green' : 'amber'}>{item.resolved ? 'Resolved' : 'Open'}</AdminBadge>
                   </div>
                   <p className="text-sm leading-6 text-slate-700">{item.message}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </AdminPanel>
-
-        <AdminPanel title={`Chat Sessions (${chatSessions.length})`} description="Stored chatbot conversations for this player.">
-          {chatSessions.length === 0 ? (
-            <div className="p-5">
-              <AdminEmpty title="No chat history" />
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {chatSessions.map((session) => (
-                <div key={session.sessionId}>
-                  <button
-                    type="button"
-                    onClick={() => setExpandedSession(expandedSession === session.sessionId ? null : session.sessionId)}
-                    className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-slate-50"
-                  >
-                    <span>
-                      <span className="block text-sm font-semibold text-slate-950">
-                        Session {session.sessionId.slice(0, 20)}
-                      </span>
-                      <span className="mt-1 block text-xs text-slate-500">{formatDate(session.lastMessageAt)}</span>
-                    </span>
-                    <AdminBadge tone="slate">{session.messageCount} messages</AdminBadge>
-                  </button>
-                  {expandedSession === session.sessionId && (
-                    <div className="space-y-3 border-t border-slate-200 bg-slate-50 px-5 py-4">
-                      {session.messages.map((message) => (
-                        <div
-                          key={message.id}
-                          className={`max-w-3xl rounded-lg border px-4 py-3 text-sm leading-6 ${
-                            message.role === 'user'
-                              ? 'ml-auto border-blue-200 bg-blue-50 text-blue-900'
-                              : 'border-slate-200 bg-white text-slate-700'
-                          }`}
-                        >
-                          <span className="mb-1 block text-xs font-semibold uppercase text-slate-500">{message.role}</span>
-                          <p className="whitespace-pre-wrap">{message.content}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               ))}
             </div>

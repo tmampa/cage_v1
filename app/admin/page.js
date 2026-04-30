@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   ChartBarIcon,
-  ChatBubbleLeftRightIcon,
   EnvelopeIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline';
@@ -38,7 +37,6 @@ function DashboardContent() {
   const cards = [
     { title: 'Users', href: '/admin/users', icon: UsersIcon, stat: stats?.users?.totalUsers ?? '-', tone: 'blue' },
     { title: 'Feedback', href: '/admin/feedback', icon: EnvelopeIcon, stat: stats?.feedback?.feedbackCount ?? '-', tone: 'green' },
-    { title: 'Chat History', href: '/admin/chat', icon: ChatBubbleLeftRightIcon, stat: 'View', tone: 'slate' },
     { title: 'Analytics', href: '/admin/analytics', icon: ChartBarIcon, stat: 'Open', tone: 'amber' },
   ];
 
