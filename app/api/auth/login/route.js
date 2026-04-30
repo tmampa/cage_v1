@@ -1,23 +1,16 @@
 import { NextResponse } from 'next/server';
-import { db } from '../../../../lib/db.js';
-import { users } from '../../../../db/schema.js';
 import { verifyPassword, createJWT, buildSessionCookie } from '../../../../lib/auth.js';
-import { eq } from 'drizzle-orm';
+import { parseBody } from '../../../../lib/validation/parse.js';
+import { AuthLoginSchema } from '../../../../lib/validation/schemas.js';
+import { findUserByUsername } from '../../../../db/queries/userRepo.js';
 
 export async function POST(request) {
   try {
-    const { username, password } = await request.json();
+    const parsed = await parseBody(request, AuthLoginSchema);
+    if (!parsed.ok) return parsed.response;
+    const { username, password } = parsed.data;
 
-    if (!username || !password) {
-      return NextResponse.json({ error: 'Username and password are required.' }, { status: 400 });
-    }
-
-    // Lookup user by username (case-insensitive)
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.username, username.toLowerCase()))
-      .limit(1);
+    const user = await findUserByUsername(username.toLowerCase());
 
     if (!user) {
       return NextResponse.json({ error: 'Invalid username or password.' }, { status: 401 });

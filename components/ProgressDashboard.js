@@ -107,7 +107,7 @@ export default function ProgressDashboard({
             <p className="text-gray-600">Ready to continue your cybersecurity journey?</p>
           </div>
           <div className="text-right">
-            <div className="text-3xl mb-1">{userProfile?.avatar_emoji || '🛡️'}</div>
+            <div className="text-3xl mb-1">{userProfile?.avatarEmoji || '🛡️'}</div>
           </div>
         </div>
 

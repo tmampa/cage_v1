@@ -300,7 +300,7 @@ export default function FeedbackButton() {
                   <div className="bg-blue-50 rounded-lg p-3">
                     <p className="text-xs text-blue-600 mb-1">Sending as:</p>
                     <div className="flex items-center gap-2">
-                      <span className="text-lg">{userProfile.avatar_emoji || '👤'}</span>
+                      <span className="text-lg">{userProfile.avatarEmoji || '👤'}</span>
                       <div>
                         <p className="text-sm font-medium text-blue-700">
                           {userProfile.username}

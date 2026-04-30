@@ -25,86 +25,29 @@ import EnhancedButton from '../../../components/EnhancedButton';
 import { getAchievementProgress } from '../../../utils/achievements';
 import { extractLevelsContext, throttle } from '../../../utils/chatbotContext';
 import BottomNav from '../../../components/BottomNav';
+import { LEVEL_DEFINITIONS } from '../../../constants/levels';
+
+// Map a canonical LevelDefinition into the UI shape the levels page renders.
+// Only level 1 starts unlocked; the progress effect below recomputes this.
+const initialLevels = () =>
+  LEVEL_DEFINITIONS.map((l) => ({
+    id: l.id,
+    title: l.title,
+    description: l.description,
+    difficulty: l.difficulty,
+    unlocked: l.id === 1,
+    completed: false,
+    icon: l.icon,
+    color: l.color,
+    points: l.points,
+    questions: l.questionsCount,
+  }));
 
 export default function LevelsPage() {
   const { user, userProfile } = useAuth();
   const router = useRouter();
 
-  // State for levels and user progress
-  const [levels, setLevels] = useState([
-    {
-      id: 1,
-      title: 'Cyber Security Basics',
-      description: 'Learn the fundamentals of staying safe online',
-      difficulty: 'Easy',
-      unlocked: true,
-      completed: false,
-      icon: '🛡️',
-      color: 'from-blue-400 to-blue-600',
-      points: 100,
-      questions: 5,
-    },
-    {
-      id: 2,
-      title: 'Password Protection',
-      description: 'Create strong passwords and keep them safe',
-      difficulty: 'Easy',
-      unlocked: false,
-      completed: false,
-      icon: '🔑',
-      color: 'from-green-400 to-green-600',
-      points: 150,
-      questions: 6,
-    },
-    {
-      id: 3,
-      title: 'Phishing Attacks',
-      description: 'Identify and avoid dangerous emails and messages',
-      difficulty: 'Medium',
-      unlocked: false,
-      completed: false,
-      icon: '🎣',
-      color: 'from-yellow-400 to-yellow-600',
-      points: 200,
-      questions: 7,
-    },
-    {
-      id: 4,
-      title: 'Safe Web Browsing',
-      description: 'Navigate the internet safely and avoid threats',
-      difficulty: 'Medium',
-      unlocked: false,
-      completed: false,
-      icon: '🌐',
-      color: 'from-purple-400 to-purple-600',
-      points: 250,
-      questions: 8,
-    },
-    {
-      id: 5,
-      title: 'Social Media Safety',
-      description: 'Protect your personal information on social platforms',
-      difficulty: 'Hard',
-      unlocked: false,
-      completed: false,
-      icon: '📱',
-      color: 'from-pink-400 to-pink-600',
-      points: 300,
-      questions: 9,
-    },
-    {
-      id: 6,
-      title: 'Malware Defense',
-      description: 'Understand and protect against computer viruses',
-      difficulty: 'Hard',
-      unlocked: false,
-      completed: false,
-      icon: '🦠',
-      color: 'from-red-400 to-red-600',
-      points: 350,
-      questions: 10,
-    },
-  ]);
+  const [levels, setLevels] = useState(initialLevels);
 
   // Track user progress stats
   const [progressStats, setProgressStats] = useState({
@@ -301,7 +244,7 @@ export default function LevelsPage() {
                 className='flex items-center gap-2 bg-white rounded-xl px-3 py-2 shadow-sm hover:shadow-md transition-all'
               >
                 <div className='w-8 h-8 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center'>
-                  <span className='text-lg'>{userProfile?.avatar_emoji || '👤'}</span>
+                  <span className='text-lg'>{userProfile?.avatarEmoji || '👤'}</span>
                 </div>
                 <div className="hidden sm:block">
                   <div className='text-sm font-bold text-gray-800'>{userProfile?.username || 'User'}</div>

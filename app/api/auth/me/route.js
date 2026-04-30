@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { db } from '../../../../lib/db.js';
-import { users } from '../../../../db/schema.js';
 import { verifyJWT, COOKIE_NAME } from '../../../../lib/auth.js';
-import { eq } from 'drizzle-orm';
+import { parseBody } from '../../../../lib/validation/parse.js';
+import { AuthMePatchSchema } from '../../../../lib/validation/schemas.js';
+import { findSafeUserById, updateUserProfile } from '../../../../db/queries/userRepo.js';
 
 export async function GET() {
   try {
@@ -19,19 +19,7 @@ export async function GET() {
       return NextResponse.json({ user: null });
     }
 
-    const [user] = await db
-      .select({
-        id:          users.id,
-        username:    users.username,
-        avatarEmoji: users.avatarEmoji,
-        score:       users.score,
-        isAdmin:     users.isAdmin,
-        createdAt:   users.createdAt,
-      })
-      .from(users)
-      .where(eq(users.id, Number(payload.sub)))
-      .limit(1);
-
+    const user = await findSafeUserById(payload.sub);
     if (!user) {
       return NextResponse.json({ user: null });
     }
@@ -53,37 +41,15 @@ export async function PATCH(request) {
     const payload = await verifyJWT(token);
     if (!payload) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { username, avatarEmoji } = await request.json();
+    const parsed = await parseBody(request, AuthMePatchSchema);
+    if (!parsed.ok) return parsed.response;
+    const { username, avatarEmoji } = parsed.data;
+
     const updateData = {};
+    if (username) updateData.username = username.toLowerCase();
+    if (avatarEmoji) updateData.avatarEmoji = avatarEmoji;
 
-    if (username) {
-      const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
-      if (!USERNAME_RE.test(username)) {
-        return NextResponse.json({ error: 'Invalid username format.' }, { status: 400 });
-      }
-      updateData.username = username.toLowerCase();
-    }
-
-    if (avatarEmoji) {
-      updateData.avatarEmoji = avatarEmoji;
-    }
-
-    if (Object.keys(updateData).length === 0) {
-      return NextResponse.json({ error: 'Nothing to update.' }, { status: 400 });
-    }
-
-    const [updated] = await db
-      .update(users)
-      .set(updateData)
-      .where(eq(users.id, Number(payload.sub)))
-      .returning({
-        id:          users.id,
-        username:    users.username,
-        avatarEmoji: users.avatarEmoji,
-        score:       users.score,
-        isAdmin:     users.isAdmin,
-      });
-
+    const updated = await updateUserProfile(payload.sub, updateData);
     return NextResponse.json({ user: updated });
   } catch (error) {
     if (error?.code === '23505') {

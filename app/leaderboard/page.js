@@ -138,7 +138,7 @@ export default function LeaderboardPage() {
               <div className='flex items-center gap-2 bg-white rounded-lg px-3 py-1 shadow-md hover:bg-blue-50 transition-colors'>
                 <div className='bg-blue-100 rounded-full p-1'>
                   <span className='text-xl'>
-                    {userProfile?.avatar_emoji || '👤'}
+                    {userProfile?.avatarEmoji || '👤'}
                   </span>
                 </div>
                 <span className='font-bold text-purple-700'>
@@ -173,7 +173,7 @@ export default function LeaderboardPage() {
             <div className='flex items-center justify-between'>
               <div className='flex items-center gap-3'>
                 <div className='w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-2xl'>
-                  {userProfile?.avatar_emoji || '👤'}
+                  {userProfile?.avatarEmoji || '👤'}
                 </div>
                 <div>
                   <p className='text-sm text-blue-600'>Your Rank</p>

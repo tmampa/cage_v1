@@ -90,7 +90,7 @@ export default function Home() {
             <Link href="/profile">
               <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-1 shadow-md hover:bg-blue-50 transition-colors">
                 <div className="bg-blue-100 rounded-full p-1">
-                  <span className="text-xl">{userProfile?.avatar_emoji || "👤"}</span>
+                  <span className="text-xl">{userProfile?.avatarEmoji || "👤"}</span>
                 </div>
                 <span className="font-bold text-purple-700">{userProfile?.username || "User"}</span>
               </div>
@@ -166,7 +166,7 @@ export default function Home() {
             <div className="game-card p-6 text-center">
               <div className="flex items-center justify-center mb-4">
                 <div className="bg-purple-100 rounded-full p-3 mr-3">
-                  <span className="text-3xl">{userProfile.avatar_emoji || "👤"}</span>
+                  <span className="text-3xl">{userProfile.avatarEmoji || "👤"}</span>
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-purple-700">

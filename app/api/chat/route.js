@@ -1,50 +1,17 @@
 import { GoogleGenAI } from '@google/genai';
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { eq } from 'drizzle-orm';
-import { db } from '../../../lib/db.js';
 import { COOKIE_NAME, verifyJWT } from '../../../lib/auth.js';
-import { chatMessages, users } from '../../../db/schema.js';
 import { checkRateLimit, RATE_LIMIT_CONFIG } from '@/utils/rateLimiter';
+import { parseBody } from '../../../lib/validation/parse.js';
+import { ChatPostSchema } from '../../../lib/validation/schemas.js';
+import { findUserAuthSummaryById } from '../../../db/queries/userRepo.js';
+import { insertChatMessage } from '../../../db/queries/chatRepo.js';
 
-// Initialize Gemini AI with server-only API key
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-/**
- * Validate request body
- * @param {object} body - Request body
- * @returns {object} - Validation result
- */
-function validateRequest(body) {
-  const errors = [];
-  
-  if (!body.message || typeof body.message !== 'string') {
-    errors.push('Message is required and must be a string');
-  } else if (body.message.length > 500) {
-    errors.push('Message must be 500 characters or less');
-  } else if (body.message.trim().length === 0) {
-    errors.push('Message cannot be empty');
-  }
-  
-  if (body.conversationHistory && !Array.isArray(body.conversationHistory)) {
-    errors.push('Conversation history must be an array');
-  }
-
-  if (body.sessionId && typeof body.sessionId !== 'string') {
-    errors.push('Session ID must be a string');
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors
-  };
-}
-
 function normalizeSessionId(sessionId) {
-  if (typeof sessionId === 'string' && /^[a-zA-Z0-9_-]{8,80}$/.test(sessionId)) {
-    return sessionId;
-  }
-
+  if (sessionId) return sessionId;
   return `server-${Date.now()}`;
 }
 
@@ -56,23 +23,14 @@ async function getAuthenticatedChatUser() {
   const payload = await verifyJWT(token);
   if (!payload) return null;
 
-  const [user] = await db
-    .select({
-      id:      users.id,
-      isAdmin: users.isAdmin,
-    })
-    .from(users)
-    .where(eq(users.id, Number(payload.sub)))
-    .limit(1);
-
-  return user || null;
+  return findUserAuthSummaryById(payload.sub);
 }
 
 async function saveChatMessage({ chatUser, sessionId, role, content }) {
   if (!chatUser || chatUser.isAdmin) return;
 
   try {
-    await db.insert(chatMessages).values({
+    await insertChatMessage({
       userId: chatUser.id,
       sessionId,
       role,
@@ -114,17 +72,9 @@ export async function POST(request) {
       );
     }
     
-    // Parse request body
-    const body = await request.json();
-    
-    // Validate request
-    const validation = validateRequest(body);
-    if (!validation.isValid) {
-      return NextResponse.json(
-        { error: validation.errors.join(', ') },
-        { status: 400 }
-      );
-    }
+    const parsed = await parseBody(request, ChatPostSchema);
+    if (!parsed.ok) return parsed.response;
+    const body = parsed.data;
 
     const sessionId = normalizeSessionId(body.sessionId);
     const chatUser = await getAuthenticatedChatUser();
@@ -132,7 +82,7 @@ export async function POST(request) {
       chatUser,
       sessionId,
       role: 'user',
-      content: body.message.trim(),
+      content: body.message,
     });
     
     // Check API key configuration

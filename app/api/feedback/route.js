@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { db } from '../../../lib/db.js';
-import { feedback } from '../../../db/schema.js';
 import { verifyJWT, COOKIE_NAME } from '../../../lib/auth.js';
+import { parseBody } from '../../../lib/validation/parse.js';
+import { FeedbackPostSchema } from '../../../lib/validation/schemas.js';
+import { createFeedback } from '../../../db/queries/feedbackRepo.js';
 
 export async function POST(request) {
   try {
@@ -20,19 +21,11 @@ export async function POST(request) {
       }
     }
 
-    const { feedbackType = 'general', rating = 0, message } = await request.json();
+    const parsed = await parseBody(request, FeedbackPostSchema);
+    if (!parsed.ok) return parsed.response;
+    const { feedbackType, rating, message } = parsed.data;
 
-    if (!message?.trim()) {
-      return NextResponse.json({ error: 'Message is required.' }, { status: 400 });
-    }
-
-    await db.insert(feedback).values({
-      userId,
-      username,
-      feedbackType,
-      rating: Number(rating),
-      message: message.trim(),
-    });
+    await createFeedback({ userId, username, feedbackType, rating, message });
 
     return NextResponse.json({ success: true });
   } catch (error) {

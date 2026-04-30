@@ -125,7 +125,7 @@ export function extractProfileContext(userProfile, achievements, progressStats) 
     userProgress: {
       username: userProfile?.username || 'User',
       currentScore: userProfile?.score || 0,
-      avatarEmoji: userProfile?.avatar_emoji || '👤',
+      avatarEmoji: userProfile?.avatarEmoji || '👤',
       completedLevels: progressStats?.completedLevels || [],
       totalAchievements: achievements?.length || 0,
       earnedAchievements: achievements?.filter(a => a.earnedAt).length || 0,

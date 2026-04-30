@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { db } from '../../../lib/db.js';
-import { levelProgress, users } from '../../../db/schema.js';
 import { verifyJWT, COOKIE_NAME } from '../../../lib/auth.js';
-import { eq, and, sql } from 'drizzle-orm';
+import { parseBody } from '../../../lib/validation/parse.js';
+import { ProgressPostSchema } from '../../../lib/validation/schemas.js';
+import {
+  getProgressByUserId,
+  upsertProgressWithBestScore,
+  sumCompletedScore,
+} from '../../../db/queries/progressRepo.js';
+import { updateUserScore } from '../../../db/queries/userRepo.js';
 
 // GET — fetch current user's level progress
 export async function GET() {
@@ -18,11 +23,7 @@ export async function GET() {
 
     const userId = Number(payload.sub);
 
-    const progress = await db
-      .select()
-      .from(levelProgress)
-      .where(eq(levelProgress.userId, userId));
-
+    const progress = await getProgressByUserId(userId);
     return NextResponse.json({ progress });
   } catch (error) {
     console.error('Get progress error:', error);
@@ -44,43 +45,15 @@ export async function POST(request) {
     }
 
     const userId = Number(payload.sub);
-    const { levelId, score, completed } = await request.json();
 
-    if (typeof levelId !== 'number' || typeof score !== 'number') {
-      return NextResponse.json({ error: 'Invalid data.' }, { status: 400 });
-    }
+    const parsed = await parseBody(request, ProgressPostSchema);
+    if (!parsed.ok) return parsed.response;
+    const { levelId, score, completed } = parsed.data;
 
-    // Upsert progress — only improve score if already completed
-    const existing = await db
-      .select()
-      .from(levelProgress)
-      .where(and(eq(levelProgress.userId, userId), eq(levelProgress.levelId, levelId)))
-      .limit(1);
+    await upsertProgressWithBestScore({ userId, levelId, score, completed });
 
-    if (existing.length > 0) {
-      const shouldUpdate = !existing[0].completed || score > existing[0].score;
-      if (shouldUpdate) {
-        await db
-          .update(levelProgress)
-          .set({ score, completed: completed || existing[0].completed, lastPlayedAt: new Date() })
-          .where(and(eq(levelProgress.userId, userId), eq(levelProgress.levelId, levelId)));
-      }
-    } else {
-      await db.insert(levelProgress).values({ userId, levelId, score, completed });
-    }
-
-    // Recalculate total score from all completed levels
-    const result = await db
-      .select({ total: sql`COALESCE(SUM(${levelProgress.score}), 0)` })
-      .from(levelProgress)
-      .where(and(eq(levelProgress.userId, userId), eq(levelProgress.completed, true)));
-
-    const totalScore = Number(result[0]?.total ?? 0);
-
-    await db
-      .update(users)
-      .set({ score: totalScore })
-      .where(eq(users.id, userId));
+    const totalScore = await sumCompletedScore(userId);
+    await updateUserScore(userId, totalScore);
 
     return NextResponse.json({ success: true, totalScore });
   } catch (error) {

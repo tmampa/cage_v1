@@ -2,69 +2,13 @@ import { GoogleGenAI } from "@google/genai";
 import { NextResponse } from "next/server";
 import fs from 'fs/promises';
 import path from 'path';
+import { LEVEL_DEFINITIONS, getLevelById } from "../../../constants/levels";
+import { parseBody } from "../../../lib/validation/parse.js";
+import { QuestionsPostSchema } from "../../../lib/validation/schemas.js";
 
-// Initialize the Gemini API with server-only key
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
 });
-
-// Level definitions with their topics and difficulty
-const levelDefinitions = [
-  {
-    id: 1,
-    title: "Cyber Security Basics",
-    description: "Learn the fundamentals of staying safe online",
-    difficulty: "Easy",
-    topics: ["basic internet safety", "digital citizenship", "online privacy fundamentals"],
-    questionsCount: 5,
-    focusAreas: ["what is cyber security", "basic online threats", "digital footprints"],
-  },
-  {
-    id: 2,
-    title: "Password Protection",
-    description: "Create strong passwords and keep them safe",
-    difficulty: "Easy",
-    topics: ["password strength", "password managers", "credential security", "two-factor authentication"],
-    questionsCount: 6,
-    focusAreas: ["creating strong passwords", "password storage", "authentication methods"],
-  },
-  {
-    id: 3,
-    title: "Phishing Attacks",
-    description: "Identify and avoid dangerous emails and messages",
-    difficulty: "Medium",
-    topics: ["phishing emails", "suspicious links", "social engineering tactics", "email scams"],
-    questionsCount: 7,
-    focusAreas: ["recognizing phishing emails", "suspicious website indicators", "social engineering red flags"],
-  },
-  {
-    id: 4,
-    title: "Safe Web Browsing",
-    description: "Navigate the internet safely and avoid threats",
-    difficulty: "Medium",
-    topics: ["browser security", "safe websites", "download safety", "HTTPS protocols", "URL verification"],
-    questionsCount: 8,
-    focusAreas: ["identifying secure websites", "browser privacy settings", "safe downloading practices", "certificate verification", "avoiding malicious websites"],
-  },
-  {
-    id: 5,
-    title: "Social Media Safety",
-    description: "Protect your personal information on social platforms",
-    difficulty: "Hard",
-    topics: ["privacy settings", "information sharing", "social media scams", "digital reputation", "account security"],
-    questionsCount: 9,
-    focusAreas: ["configuring privacy settings", "safe information sharing", "recognizing social media scams", "protecting personal data", "managing digital footprint"],
-  },
-  {
-    id: 6,
-    title: "Malware Defense",
-    description: "Understand and protect against computer viruses",
-    difficulty: "Hard",
-    topics: ["malware types", "virus protection", "infection prevention", "antivirus software", "system security"],
-    questionsCount: 10,
-    focusAreas: ["identifying malware types", "antivirus best practices", "system vulnerability protection", "malware removal techniques", "preventive security measures"],
-  },
-];
 
 // File-based cache for generated questions (persists across server restarts)
 const CACHE_FILE = path.join(process.cwd(), '.questions-cache.json');
@@ -142,7 +86,7 @@ function shuffleQuestionOptions(question) {
 
 
 async function generateQuestionsForLevel(levelId) {
-  const level = levelDefinitions.find((l) => l.id === parseInt(levelId));
+  const level = getLevelById(levelId);
   if (!level) {
     throw new Error(`Level with ID ${levelId} not found`);
   }
@@ -232,19 +176,10 @@ async function generateQuestionsForLevel(levelId) {
 
 export async function POST(request) {
   try {
-    const body = await request.json();
-    const { levelId } = body;
+    const parsed = await parseBody(request, QuestionsPostSchema);
+    if (!parsed.ok) return parsed.response;
 
-    if (!levelId || isNaN(parseInt(levelId))) {
-      return NextResponse.json({ error: "Valid levelId is required" }, { status: 400 });
-    }
-
-    const parsedLevelId = parseInt(levelId);
-    if (parsedLevelId < 1 || parsedLevelId > 6) {
-      return NextResponse.json({ error: "levelId must be between 1 and 6" }, { status: 400 });
-    }
-
-    const questions = await generateQuestionsForLevel(parsedLevelId);
+    const questions = await generateQuestionsForLevel(parsed.data.levelId);
 
     return NextResponse.json({ questions });
   } catch (error) {
@@ -259,6 +194,6 @@ export async function POST(request) {
 export async function GET() {
   return NextResponse.json({
     status: "ok",
-    levels: levelDefinitions.map(l => ({ id: l.id, title: l.title, questionsCount: l.questionsCount })),
+    levels: LEVEL_DEFINITIONS.map(l => ({ id: l.id, title: l.title, questionsCount: l.questionsCount })),
   });
 }

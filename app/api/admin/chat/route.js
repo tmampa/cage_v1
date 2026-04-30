@@ -1,15 +1,19 @@
 import { NextResponse } from 'next/server';
 import { verifyAdmin } from '../../../../lib/verifyAdmin.js';
-import { getChatSessionsForUser, getChatUsersWithHistory } from '../../../../lib/chatHistory.js';
+import { getChatSessionsForUser, getChatUsersWithHistory } from '../../../../db/queries/chatRepo.js';
+import { parseQuery } from '../../../../lib/validation/parse.js';
+import { AdminChatQuerySchema } from '../../../../lib/validation/schemas.js';
+import { errorResponse } from '../../../../lib/api/errors.js';
 
 export async function GET(request) {
   try {
     await verifyAdmin(request);
 
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
+    const parsed = parseQuery(request.url, AdminChatQuerySchema);
+    if (!parsed.ok) return parsed.response;
+    const { userId } = parsed.data;
 
-    if (!userId) {
+    if (userId === undefined) {
       const chatUsers = await getChatUsersWithHistory();
       return NextResponse.json({ chatUsers });
     }
@@ -17,7 +21,6 @@ export async function GET(request) {
     const sessions = await getChatSessionsForUser(userId);
     return NextResponse.json({ userId, sessions });
   } catch (error) {
-    const status = error.message.includes('Forbidden') ? 403 : error.message.includes('Missing') ? 401 : 500;
-    return NextResponse.json({ error: error.message }, { status });
+    return errorResponse(error, 'admin/chat');
   }
 }

@@ -1,50 +1,26 @@
 import { NextResponse } from 'next/server';
-import { db } from '../../../../lib/db.js';
-import { users, levelProgress } from '../../../../db/schema.js';
 import { verifyAdmin } from '../../../../lib/verifyAdmin.js';
-import { and, desc, asc, eq, ilike, inArray } from 'drizzle-orm';
+import { parseQuery } from '../../../../lib/validation/parse.js';
+import { AdminUsersQuerySchema } from '../../../../lib/validation/schemas.js';
+import { errorResponse } from '../../../../lib/api/errors.js';
+import { listAdminUsers } from '../../../../db/queries/userRepo.js';
+import { getProgressForUsers } from '../../../../db/queries/progressRepo.js';
 
 export async function GET(request) {
   try {
     await verifyAdmin(request);
 
-    const { searchParams } = new URL(request.url);
-    const limitNum = Math.min(parseInt(searchParams.get('limit') || '50', 10), 200);
-    const sortBy = searchParams.get('sortBy') || 'score';
-    const order = searchParams.get('order') || 'desc';
-    const search = (searchParams.get('search') || '').toLowerCase();
+    const parsed = parseQuery(request.url, AdminUsersQuerySchema);
+    if (!parsed.ok) return parsed.response;
 
-    // Build order-by clause
-    const sortColumn = sortBy === 'username' ? users.username : users.score;
-    const orderFn = order === 'asc' ? asc : desc;
+    const rows = await listAdminUsers(parsed.data);
 
-    const filters = [eq(users.isAdmin, false)];
-    if (search) {
-      filters.push(ilike(users.username, `%${search}%`));
-    }
+    const userIds = rows.map((u) => u.id);
+    const progressRows = await getProgressForUsers(userIds);
 
-    const rows = await db
-      .select({
-        id:          users.id,
-        username:    users.username,
-        avatarEmoji: users.avatarEmoji,
-        score:       users.score,
-        isAdmin:     users.isAdmin,
-        createdAt:   users.createdAt,
-      })
-      .from(users)
-      .where(and(...filters))
-      .orderBy(orderFn(sortColumn))
-      .limit(limitNum);
-
-    // Enrich with level progress counts
-    const userIds = rows.map(u => u.id);
-    const progressRows = userIds.length > 0
-      ? await db.select().from(levelProgress).where(inArray(levelProgress.userId, userIds))
-      : [];
-    const enriched = rows.map(u => {
-      const prog = progressRows.filter(p => p.userId === u.id);
-      const completed = prog.filter(p => p.completed).length;
+    const enriched = rows.map((u) => {
+      const prog = progressRows.filter((p) => p.userId === u.id);
+      const completed = prog.filter((p) => p.completed).length;
       const lastPlayed = prog.reduce((latest, p) => {
         const t = p.lastPlayedAt ? new Date(p.lastPlayedAt) : null;
         return t && (!latest || t > latest) ? t : latest;
@@ -58,7 +34,6 @@ export async function GET(request) {
 
     return NextResponse.json({ users: enriched });
   } catch (error) {
-    const status = error.message.includes('Forbidden') ? 403 : error.message.includes('Missing') ? 401 : 500;
-    return NextResponse.json({ error: error.message }, { status });
+    return errorResponse(error, 'admin/users');
   }
 }

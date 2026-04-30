@@ -1,19 +1,15 @@
 import { NextResponse } from 'next/server';
-import { db } from '../../../../lib/db.js';
-import { users, levelProgress, feedback } from '../../../../db/schema.js';
 import { verifyAdmin } from '../../../../lib/verifyAdmin.js';
-import { eq, inArray } from 'drizzle-orm';
+import { errorResponse } from '../../../../lib/api/errors.js';
+import { listUsersForAnalytics } from '../../../../db/queries/userRepo.js';
+import { getProgressForUsers } from '../../../../db/queries/progressRepo.js';
+import { getAllFeedback } from '../../../../db/queries/feedbackRepo.js';
 
 export async function GET(request) {
   try {
     await verifyAdmin(request);
 
-    // ---- Users stats ----
-    const allUsers = await db.select({
-      id:        users.id,
-      score:     users.score,
-      createdAt: users.createdAt,
-    }).from(users).where(eq(users.isAdmin, false));
+    const allUsers = await listUsersForAnalytics();
 
     const totalUsers = allUsers.length;
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -33,11 +29,8 @@ export async function GET(request) {
       else scoreBuckets['500+']++;
     });
 
-    // ---- Level progress stats ----
     const playerIds = allUsers.map(u => u.id);
-    const allProgress = playerIds.length > 0
-      ? await db.select().from(levelProgress).where(inArray(levelProgress.userId, playerIds))
-      : [];
+    const allProgress = await getProgressForUsers(playerIds);
 
     const levelStats = {};
     allProgress.forEach(p => {
@@ -57,8 +50,7 @@ export async function GET(request) {
     const usersWithCompletion = new Set(allProgress.filter(p => p.completed).map(p => p.userId));
     const overallPassRate = totalUsers > 0 ? Math.round((usersWithCompletion.size / totalUsers) * 100) : 0;
 
-    // ---- Feedback stats ----
-    const allFeedback = await db.select().from(feedback);
+    const allFeedback = await getAllFeedback();
     const feedbackCount = allFeedback.length;
     const ratingDist = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
     const typeDist = { general: 0, bug: 0, feature: 0 };
@@ -73,7 +65,6 @@ export async function GET(request) {
       feedback: { feedbackCount, ratingDist, typeDist },
     });
   } catch (error) {
-    const status = error.message.includes('Forbidden') ? 403 : error.message.includes('Missing') ? 401 : 500;
-    return NextResponse.json({ error: error.message }, { status });
+    return errorResponse(error, 'admin/analytics');
   }
 }

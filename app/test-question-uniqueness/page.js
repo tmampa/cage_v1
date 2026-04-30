@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { generateQuestionsForLevel } from '../../utils/generateQuestions.js';
+import { MAX_LEVEL_ID } from '../../constants/levels';
 
 export default function TestQuestionUniqueness() {
   const [results, setResults] = useState(null);
@@ -20,7 +21,7 @@ export default function TestQuestionUniqueness() {
     logs.push('🧪 Testing Question Uniqueness Across Levels\n');
     
     // Generate questions for all levels
-    for (let levelId = 1; levelId <= 6; levelId++) {
+    for (let levelId = 1; levelId <= MAX_LEVEL_ID; levelId++) {
       setCurrentLevel(levelId);
       
       try {
@@ -66,10 +67,10 @@ export default function TestQuestionUniqueness() {
     logs.push('\n📊 Cross-Level Analysis:');
     logs.push('═'.repeat(50));
     
-    for (let level1 = 1; level1 <= 6; level1++) {
+    for (let level1 = 1; level1 <= MAX_LEVEL_ID; level1++) {
       if (!allQuestions[level1]) continue;
       
-      for (let level2 = level1 + 1; level2 <= 6; level2++) {
+      for (let level2 = level1 + 1; level2 <= MAX_LEVEL_ID; level2++) {
         if (!allQuestions[level2]) continue;
         
         const questions1 = allQuestions[level1].map(q => q.question.toLowerCase());
@@ -96,7 +97,7 @@ export default function TestQuestionUniqueness() {
     let totalQuestions = 0;
     let successfulLevels = 0;
     
-    for (let levelId = 1; levelId <= 6; levelId++) {
+    for (let levelId = 1; levelId <= MAX_LEVEL_ID; levelId++) {
       const result = levelResults[levelId];
       
       if (result.error) {
@@ -113,9 +114,9 @@ export default function TestQuestionUniqueness() {
     logs.push(`\nTotal Questions Generated: ${totalQuestions}`);
     logs.push(`Unique Questions: ${allQuestionTexts.size}`);
     logs.push(`Duplication Rate: ${((totalQuestions - allQuestionTexts.size) / totalQuestions * 100).toFixed(1)}%`);
-    logs.push(`Success Rate: ${successfulLevels}/6 levels`);
+    logs.push(`Success Rate: ${successfulLevels}/${MAX_LEVEL_ID} levels`);
     
-    if (allQuestionTexts.size === totalQuestions && successfulLevels === 6) {
+    if (allQuestionTexts.size === totalQuestions && successfulLevels === MAX_LEVEL_ID) {
       logs.push('\n🎉 SUCCESS: All questions are unique across all levels!');
     } else {
       logs.push('\n⚠️  ISSUES DETECTED: Review the warnings above');

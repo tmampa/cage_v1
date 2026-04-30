@@ -1,30 +1,16 @@
 import { NextResponse } from 'next/server';
-import { db } from '../../../lib/db.js';
-import { users } from '../../../db/schema.js';
-import { desc, eq } from 'drizzle-orm';
+import { parseQuery } from '../../../lib/validation/parse.js';
+import { LeaderboardQuerySchema } from '../../../lib/validation/schemas.js';
+import { listLeaderboardUsers } from '../../../db/queries/userRepo.js';
 
 export async function GET(request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const timeFilter = searchParams.get('filter') || 'all';
+    const parsed = parseQuery(request.url, LeaderboardQuerySchema);
+    if (!parsed.ok) return parsed.response;
+    // `filter` is reserved for future time-window queries (week/month).
+    // Currently the leaderboard is always all-time.
 
-    let query = db
-      .select({
-        id:          users.id,
-        username:    users.username,
-        avatarEmoji: users.avatarEmoji,
-        score:       users.score,
-        createdAt:   users.createdAt,
-      })
-      .from(users)
-      .where(eq(users.isAdmin, false))
-      .orderBy(desc(users.score))
-      .limit(50);
-
-    // For time filters, we'd need an updatedAt column — for now return all-time
-    // Future: add updated_at column and filter by it
-    const data = await query;
-
+    const data = await listLeaderboardUsers(50);
     return NextResponse.json({ leaderboard: data });
   } catch (error) {
     console.error('Leaderboard error:', error);

@@ -70,7 +70,7 @@ function ProfilePage() {
   useEffect(() => {
     if (userProfile) {
       setUsername(userProfile.username || '');
-      setSelectedAvatar(userProfile.avatar_emoji || '👤');
+      setSelectedAvatar(userProfile.avatarEmoji || '👤');
       
       // Load actual user stats from Postgres API instead of estimating
       loadActualUserStats();
@@ -108,7 +108,7 @@ function ProfilePage() {
   useEffect(() => {
     if (userProfile) {
       setUsername(userProfile.username || '');
-      setSelectedAvatar(userProfile.avatar_emoji || '👤');
+      setSelectedAvatar(userProfile.avatarEmoji || '👤');
       loadActualUserStats();
     }
   }, [userProfile]);
@@ -127,7 +127,7 @@ function ProfilePage() {
     if (isEditing) {
       // Cancel editing - reset to original values
       setUsername(userProfile.username || '');
-      setSelectedAvatar(userProfile.avatar_emoji || '👤');
+      setSelectedAvatar(userProfile.avatarEmoji || '👤');
       setError('');
     }
     setIsEditing(!isEditing);
@@ -147,7 +147,7 @@ function ProfilePage() {
     try {
       const result = await updateProfile({
         username: username.trim(),
-        avatar_emoji: selectedAvatar,
+        avatarEmoji: selectedAvatar,
       });
 
       if (result.success) {
@@ -212,7 +212,7 @@ function ProfilePage() {
           <div className='flex items-center gap-2 bg-white rounded-lg px-3 py-1 shadow-md'>
             <div className='bg-blue-100 rounded-full p-1'>
               <span className='text-xl'>
-                {userProfile?.avatar_emoji || '👤'}
+                {userProfile?.avatarEmoji || '👤'}
               </span>
             </div>
             <span className='font-bold text-purple-700'>
