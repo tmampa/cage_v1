@@ -27,16 +27,6 @@ import EnhancedButton from '../../components/EnhancedButton';
 import { CircularProgress, AnimatedProgressBar } from '../../components/ProgressIndicators';
 import { AchievementsList } from '../../components/AchievementNotification';
 import { getAchievementProgress, DEFAULT_USER_STATS } from '../../utils/achievements';
-import { getFirebaseUserStats, getFirebaseAchievements } from '../../lib/firebase';
-import { db } from '../../lib/firebase';
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  doc,
-  getDoc,
-} from 'firebase/firestore';
 import { extractProfileContext } from '../../utils/chatbotContext';
 import BottomNav from '../../components/BottomNav';
 
@@ -82,7 +72,7 @@ function ProfilePage() {
       setUsername(userProfile.username || '');
       setSelectedAvatar(userProfile.avatar_emoji || '👤');
       
-      // Load actual user stats from Firebase instead of estimating
+      // Load actual user stats from Postgres API instead of estimating
       loadActualUserStats();
     }
   }, [userProfile]);
@@ -91,70 +81,27 @@ function ProfilePage() {
     if (!user?.id) return;
 
     try {
-      // Load real stats from Firestore
-      const savedStats = await getFirebaseUserStats(user.id);
-      
-      let calculatedStats;
-      if (savedStats) {
-        const { userId: _uid, createdAt: _c, updatedAt: _u, ...statsData } = savedStats;
-        calculatedStats = { ...DEFAULT_USER_STATS, ...statsData };
-      }
-      
-      // Also get highestLevel from user doc for reconciliation
-      const userRef = doc(db, 'users', user.id);
-      const userDocSnap = await getDoc(userRef);
-      const highestLevel = userDocSnap.exists() ? userDocSnap.data().highestLevel || 1 : 1;
+      // Load progress from API
+      const res = await fetch('/api/progress');
+      const data = await res.json();
+      const progress = data.progress || [];
+      const completedLevels = progress.filter(p => p.completed).length;
 
-      if (!calculatedStats) {
-        // No user_stats doc — estimate from level_progress + highestLevel
-        const progressRef = collection(db, 'level_progress');
-        const q = query(progressRef, where('user_id', '==', user.id));
-        const querySnapshot = await getDocs(q);
+      const calculatedStats = {
+        ...DEFAULT_USER_STATS,
+        levelsCompleted: completedLevels,
+      };
 
-        let completedLevels = 0;
-        querySnapshot.forEach((docSnap) => {
-          const data = docSnap.data();
-          if (data.completed) {
-            completedLevels++;
-          }
-        });
-
-        const inferredCompleted = Math.max(completedLevels, highestLevel - 1);
-
-        calculatedStats = {
-          ...DEFAULT_USER_STATS,
-          levelsCompleted: inferredCompleted,
-        };
-      } else {
-        // Reconcile: ensure levelsCompleted is at least highestLevel - 1
-        calculatedStats.levelsCompleted = Math.max(
-          calculatedStats.levelsCompleted || 0,
-          highestLevel - 1
-        );
-      }
-      
-      console.log('Loaded actual user stats:', calculatedStats);
       setUserStats(calculatedStats);
-      
-      // Load achievements from Firestore
-      const firestoreAchievements = await getFirebaseAchievements(user.id);
-      let earnedAchievements = firestoreAchievements || [];
-      
-      // Fallback to localStorage if no Firestore data
-      if (earnedAchievements.length === 0) {
-        const storedAchievements = localStorage.getItem(`achievements_${user.id}`);
-        if (storedAchievements) {
-          earnedAchievements = JSON.parse(storedAchievements);
-        }
-      }
-      
-      // Get achievement progress
+
+      // Load achievements from localStorage
+      const storedAchievements = localStorage.getItem(`achievements_${user.id}`);
+      const earnedAchievements = storedAchievements ? JSON.parse(storedAchievements) : [];
       const achievementProgress = getAchievementProgress(calculatedStats, earnedAchievements);
       setAchievements(achievementProgress);
     } catch (error) {
       console.error('Error loading user stats:', error);
-      const basicStats = { ...DEFAULT_USER_STATS };
-      setUserStats(basicStats);
+      setUserStats({ ...DEFAULT_USER_STATS });
     }
   };
 
@@ -306,7 +253,7 @@ function ProfilePage() {
                 <h2 className='text-xl font-bold text-purple-700'>
                   {username}
                 </h2>
-                <p className='text-sm text-blue-600'>{user.email}</p>
+                <p className='text-sm text-blue-600'>Joined CagE</p>
               </div>
             </div>
             {!isEditing ? (

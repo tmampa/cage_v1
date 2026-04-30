@@ -1,81 +1,87 @@
-import {
-  saveFirebaseLevelProgress,
-  getFirebaseUserProgress,
-  getFirebaseLevelProgress,
-  updateFirebaseUserTotalScore,
-  getFirebaseUnlockedLevels,
-  unlockFirebaseNextLevel,
-  initializeFirebaseUserProgress,
-  getFirebaseLeaderboardData,
-} from '../lib/firebase';
+/**
+ * Game progress utilities — all calls now go to the /api/progress route.
+ * No Firebase dependency.
+ */
 
 /**
- * Save a user's level progress
- * @param {string} userId - The user's ID
- * @param {number} levelId - The completed level ID
- * @param {number} score - The user's score for this level
- * @param {boolean} completed - Whether the level was successfully completed
- * @returns {Promise} - Operation result
+ * Save a user's level progress.
+ * @param {number} userId  — kept for API compatibility but not sent (server reads from JWT cookie)
+ * @param {number} levelId
+ * @param {number} score
+ * @param {boolean} completed
  */
 export async function saveLevelProgress(userId, levelId, score, completed) {
-  return saveFirebaseLevelProgress(userId, levelId, score, completed);
+  const res = await fetch('/api/progress', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ levelId, score, completed }),
+  });
+  return res.json();
 }
 
 /**
- * Get a user's progress for all levels
- * @param {string} userId - The user's ID
- * @returns {Promise<Array>} - Array of level progress objects
+ * Get a user's progress for all levels.
+ * @returns {Promise<Array>}
  */
-export async function getUserProgress(userId) {
-  return getFirebaseUserProgress(userId);
+export async function getUserProgress() {
+  const res = await fetch('/api/progress');
+  const data = await res.json();
+  return data.progress || [];
 }
 
 /**
- * Get the user's progress for a specific level
- * @param {string} userId - The user's ID
- * @param {number} levelId - The level ID
- * @returns {Promise<Object>} - Level progress object
+ * Get the user's progress for a specific level.
+ * @param {number} userId  — kept for API compatibility
+ * @param {number} levelId
  */
 export async function getLevelProgress(userId, levelId) {
-  return getFirebaseLevelProgress(userId, levelId);
+  const progress = await getUserProgress();
+  return progress.find(p => p.levelId === levelId) || null;
 }
 
 /**
- * Calculate and update a user's total score across all levels
- * @param {string} userId - The user's ID
- * @returns {Promise<number>} - The updated total score
+ * No-op — score is recalculated server-side on every POST /api/progress.
  */
-export async function updateUserTotalScore(userId) {
-  return updateFirebaseUserTotalScore(userId);
+export async function updateUserTotalScore() {
+  return 0;
 }
 
 /**
- * Get all unlocked levels for a user
- * @param {string} userId - The user's ID
- * @returns {Promise<Array>} - Array of unlocked level IDs
+ * Get all unlocked level IDs for a user.
+ * Level 1 is always unlocked; subsequent levels unlock after the prior is completed.
+ * @returns {Promise<number[]>}
  */
-export async function getUnlockedLevels(userId) {
-  return getFirebaseUnlockedLevels(userId);
+export async function getUnlockedLevels() {
+  const progress = await getUserProgress();
+  const completedIds = progress.filter(p => p.completed).map(p => p.levelId);
+  const highest = completedIds.length > 0 ? Math.max(...completedIds) : 0;
+  const unlocked = [];
+  for (let i = 1; i <= highest + 1; i++) {
+    unlocked.push(i);
+  }
+  return unlocked.length > 0 ? unlocked : [1];
 }
 
 /**
- * Unlock the next level after completing a level
- * @param {string} userId - The user's ID
- * @param {number} completedLevelId - The ID of the level that was just completed
- * @returns {Promise<boolean>} - Success status
+ * No-op — unlock logic is handled server-side.
  */
-export async function unlockNextLevel(userId, completedLevelId) {
-  return unlockFirebaseNextLevel(userId, completedLevelId);
+export async function unlockNextLevel() {
+  return true;
 }
 
 /**
- * Initialize a new user's game progress
- * @param {string} userId - The user's ID
- * @returns {Promise<boolean>} - Success status
+ * No-op — level 1 is always accessible (no explicit init needed).
  */
-export async function initializeUserProgress(userId) {
-  return initializeFirebaseUserProgress(userId);
+export async function initializeUserProgress() {
+  return true;
 }
 
-// Re-export the leaderboard data function
-export { getFirebaseLeaderboardData };
+/**
+ * Fetch leaderboard data from the API.
+ * @param {string} timeFilter — 'all' | 'week' | 'month'
+ */
+export async function getFirebaseLeaderboardData(timeFilter = 'all') {
+  const res = await fetch(`/api/leaderboard?filter=${timeFilter}`);
+  const data = await res.json();
+  return data.leaderboard || [];
+}

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
-import { adminDb } from '../../../../lib/firebaseAdmin';
-import { verifyAdmin } from '../../../../lib/verifyAdmin';
+import { db } from '../../../../lib/db.js';
+import { users, levelProgress } from '../../../../db/schema.js';
+import { verifyAdmin } from '../../../../lib/verifyAdmin.js';
+import { eq, desc, asc, ilike, sql } from 'drizzle-orm';
 
 export async function GET(request) {
   try {
@@ -12,47 +14,41 @@ export async function GET(request) {
     const order = searchParams.get('order') || 'desc';
     const search = (searchParams.get('search') || '').toLowerCase();
 
-    // Fetch users
-    let q = adminDb.collection('users').orderBy(sortBy, order).limit(limitNum);
-    const snapshot = await q.get();
+    // Build order-by clause
+    const sortColumn = sortBy === 'username' ? users.username : users.score;
+    const orderFn = order === 'asc' ? asc : desc;
 
-    let users = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+    let rows = await db
+      .select({
+        id:          users.id,
+        username:    users.username,
+        avatarEmoji: users.avatarEmoji,
+        score:       users.score,
+        isAdmin:     users.isAdmin,
+        createdAt:   users.createdAt,
+      })
+      .from(users)
+      .orderBy(orderFn(sortColumn))
+      .limit(limitNum);
 
-    // Client-side search filter (Firestore doesn't support LIKE queries)
+    // Client-side search filter
     if (search) {
-      users = users.filter(
-        (u) =>
-          (u.username || '').toLowerCase().includes(search) ||
-          (u.email || '').toLowerCase().includes(search)
-      );
+      rows = rows.filter(u => u.username.toLowerCase().includes(search));
     }
 
-    // Fetch progress for each user to get completion counts
-    // The game writes to the 'progress' collection with fields: userId, levelId, passed, score
-    const progressSnapshot = await adminDb.collection('progress').get();
-    const progressByUser = {};
-    progressSnapshot.docs.forEach((doc) => {
-      const d = doc.data();
-      const uid = d.userId || d.user_id;
-      if (!progressByUser[uid]) progressByUser[uid] = [];
-      progressByUser[uid].push(d);
-    });
-
-    const enriched = users.map((u) => {
-      const prog = progressByUser[u.id] || [];
-      const completed = prog.filter((p) => p.passed || p.completed).length;
+    // Enrich with level progress counts
+    const progressRows = await db.select().from(levelProgress);
+    const enriched = rows.map(u => {
+      const prog = progressRows.filter(p => p.userId === u.id);
+      const completed = prog.filter(p => p.completed).length;
       const lastPlayed = prog.reduce((latest, p) => {
-        const raw = p.completedAt || p.updatedAt || p.last_played_at;
-        const t = raw?.toDate?.() || (typeof raw === 'string' ? new Date(raw) : raw);
+        const t = p.lastPlayedAt ? new Date(p.lastPlayedAt) : null;
         return t && (!latest || t > latest) ? t : latest;
       }, null);
       return {
         ...u,
         levelsCompleted: completed,
-        lastPlayed: lastPlayed ? new Date(lastPlayed).toISOString() : null,
+        lastPlayed: lastPlayed ? lastPlayed.toISOString() : null,
       };
     });
 

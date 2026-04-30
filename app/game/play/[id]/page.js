@@ -29,20 +29,10 @@ import {
   generateQuestionsForLevel,
   getLevelDefinitions,
 } from '../../../../utils/generateQuestions';
-import { 
+import {
   checkAchievements, 
   DEFAULT_USER_STATS 
 } from '../../../../utils/achievements';
-import { db } from '../../../../lib/firebase';
-import { 
-  saveFirebaseUserStats, 
-  getFirebaseUserStats, 
-  saveFirebaseAchievements, 
-  getFirebaseAchievements,
-  saveFirebaseLevelProgress,
-  getFirebaseLevelProgress,
-} from '../../../../lib/firebase';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import React from 'react';
 import { extractQuestionContext, throttle } from '../../../../utils/chatbotContext';
 import { playCorrect, playWrong, playLevelComplete, playGameOver, playAchievement } from '../../../../utils/sounds';
@@ -151,9 +141,12 @@ export default function GameplayPage({ params }) {
         }
 
         // Check for existing progress
-        let userProgress = null;
         if (user?.id) {
-          userProgress = await getFirebaseLevelProgress(user.id, levelId);
+          const res = await fetch('/api/progress');
+          const data = await res.json();
+          const allProgress = data.progress || [];
+          const levelProgress = allProgress.find(p => p.levelId === levelId);
+          // levelProgress available if needed
         }
 
         // Generate new questions or load existing ones
@@ -196,42 +189,13 @@ export default function GameplayPage({ params }) {
         setFastestAnswer(Infinity);
         setQuestionStartTime(Date.now());
 
-        // Load real user stats from Firestore
+        // Load user stats and achievements from localStorage
         if (user?.id) {
-          try {
-            const savedStats = await getFirebaseUserStats(user.id);
-            if (savedStats) {
-              const { userId: _uid, createdAt: _c, updatedAt: _u, ...statsData } = savedStats;
-              setUserStats({ ...DEFAULT_USER_STATS, ...statsData });
-              console.log('Loaded user stats from Firestore:', statsData);
-            } else {
-              setUserStats({ ...DEFAULT_USER_STATS });
-            }
-          } catch (statsError) {
-            console.warn('Could not load user stats from Firestore:', statsError);
-            setUserStats({ ...DEFAULT_USER_STATS });
+          const savedAchievements = localStorage.getItem(`achievements_${user.id}`);
+          if (savedAchievements) {
+            setUserAchievements(JSON.parse(savedAchievements));
           }
-
-          // Load existing achievements from Firestore (fall back to localStorage)
-          try {
-            const firestoreAchievements = await getFirebaseAchievements(user.id);
-            if (firestoreAchievements && firestoreAchievements.length > 0) {
-              setUserAchievements(firestoreAchievements);
-              console.log('Loaded achievements from Firestore:', firestoreAchievements);
-            } else {
-              // Migrate from localStorage if exists
-              const savedAchievements = localStorage.getItem(`achievements_${user.id}`);
-              if (savedAchievements) {
-                const achievements = JSON.parse(savedAchievements);
-                setUserAchievements(achievements);
-                // Migrate to Firestore
-                await saveFirebaseAchievements(user.id, achievements);
-                console.log('Migrated achievements from localStorage to Firestore');
-              }
-            }
-          } catch (achError) {
-            console.warn('Could not load achievements:', achError);
-          }
+          setUserStats({ ...DEFAULT_USER_STATS });
         }
       } catch (error) {
         console.error('Error loading level:', error);
@@ -265,10 +229,10 @@ export default function GameplayPage({ params }) {
     let isComeback = false;
     if (passed && user?.id) {
       try {
-        const prevProgress = await getFirebaseLevelProgress(user.id, levelId);
-        if (prevProgress && !prevProgress.completed) {
-          isComeback = true;
-        }
+        const res = await fetch('/api/progress');
+        const data = await res.json();
+        const prev = (data.progress || []).find(p => p.levelId === levelId);
+        if (prev && !prev.completed) isComeback = true;
       } catch {}
     }
 
@@ -294,59 +258,29 @@ export default function GameplayPage({ params }) {
     // Update the user stats state
     setUserStats(finalStats);
 
-    // Persist stats to Firestore
+    // Save achievements to localStorage
     if (user?.id) {
       try {
-        await saveFirebaseUserStats(user.id, finalStats);
-        console.log('Saved user stats to Firestore');
-      } catch (statsError) {
-        console.error('Error saving user stats to Firestore:', statsError);
-      }
-    }
-
-    // Check for new achievements
-    try {
-      console.log('Checking achievements with stats:', finalStats);
-      console.log('Current user achievements:', userAchievements);
-      
-      const newAchievements = checkAchievements(finalStats, userAchievements);
-      if (newAchievements.length > 0) {
-        // Show the first new achievement
-        playAchievement();
-        setNewAchievement(newAchievements[0]);
-        // Add to user achievements
-        const allAchievements = [...userAchievements, ...newAchievements];
-        setUserAchievements(allAchievements);
-        console.log('New achievements earned:', newAchievements);
-        
-        // Save achievements to Firestore
-        if (user?.id) {
-          try {
-            await saveFirebaseAchievements(user.id, allAchievements);
-            console.log('Saved achievements to Firestore');
-          } catch (achError) {
-            console.error('Error saving achievements to Firestore:', achError);
-          }
+        const newAchievements = checkAchievements(finalStats, userAchievements);
+        if (newAchievements.length > 0) {
+          playAchievement();
+          setNewAchievement(newAchievements[0]);
+          const allAchievements = [...userAchievements, ...newAchievements];
+          setUserAchievements(allAchievements);
+          localStorage.setItem(`achievements_${user.id}`, JSON.stringify(allAchievements));
         }
-      } else {
-        console.log('No new achievements earned this time');
+      } catch (error) {
+        console.error('Error checking achievements:', error);
       }
-    } catch (error) {
-      console.error('Error checking achievements:', error);
-    }
 
-    // Save progress to Firebase
-    if (user?.id) {
+      // Save progress to API
       try {
-        await saveFirebaseLevelProgress(user.id, levelId, score, passed);
-
-        // If this level was completed successfully, clear the last played level
-        // so the continue button moves to the next level
-        if (passed) {
-          localStorage.removeItem(`lastPlayedLevel_${user.id}`);
-        }
-
-        console.log(`Progress saved for level ${levelId}`);
+        await fetch('/api/progress', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ levelId, score, completed: passed }),
+        });
+        if (passed) localStorage.removeItem(`lastPlayedLevel_${user.id}`);
       } catch (error) {
         console.error('Error saving progress:', error);
       }
@@ -510,11 +444,7 @@ export default function GameplayPage({ params }) {
           const allAch = [...userAchievements, ...newAchievements];
           setNewAchievement(newAchievements[0]);
           setUserAchievements(allAch);
-          if (user?.id) {
-            saveFirebaseAchievements(user.id, allAch).catch(e =>
-              console.error('Error persisting mid-game achievement:', e)
-            );
-          }
+          if (user?.id) localStorage.setItem(`achievements_${user.id}`, JSON.stringify(allAch));
         }
       } catch (error) {
         console.error('Error checking achievements during gameplay:', error);
@@ -547,11 +477,7 @@ export default function GameplayPage({ params }) {
           const allAch = [...userAchievements, ...newAchievements];
           setNewAchievement(newAchievements[0]);
           setUserAchievements(allAch);
-          if (user?.id) {
-            saveFirebaseAchievements(user.id, allAch).catch(e =>
-              console.error('Error persisting mid-game achievement:', e)
-            );
-          }
+          if (user?.id) localStorage.setItem(`achievements_${user.id}`, JSON.stringify(allAch));
         }
       } catch (error) {
         console.error('Error checking achievements during gameplay:', error);

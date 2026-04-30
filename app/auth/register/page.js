@@ -9,35 +9,30 @@ import {
   ShieldCheckIcon,
   ArrowLeftIcon,
   LockClosedIcon,
-  EnvelopeIcon,
   UserIcon,
 } from '@heroicons/react/24/solid';
 
 export default function RegisterPage() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const { register, loginWithGoogle } = useAuth();
+  const { register } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    // Validate inputs
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
     }
-
     if (password.length < 6) {
       setError('Password must be at least 6 characters');
       return;
     }
-
     if (username.length < 3) {
       setError('Username must be at least 3 characters');
       return;
@@ -46,24 +41,10 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      await register(email, password);
+      await register(username.trim(), password);
       router.push('/game/levels');
-    } catch (error) {
-      setError(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGoogleSignIn = async () => {
-    setError('');
-    setLoading(true);
-
-    try {
-      await loginWithGoogle();
-      router.push('/game/levels');
-    } catch (error) {
-      setError(error.message);
+    } catch (err) {
+      setError(err.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -79,10 +60,7 @@ export default function RegisterPage() {
 
       {/* Back button */}
       <div className='absolute top-4 left-4'>
-        <Link
-          href='/'
-          className='text-blue-700 hover:text-blue-900 flex items-center'
-        >
+        <Link href='/' className='text-blue-700 hover:text-blue-900 flex items-center'>
           <ArrowLeftIcon className='h-5 w-5 mr-1' />
           <span>Back</span>
         </Link>
@@ -98,21 +76,18 @@ export default function RegisterPage() {
           <div className='text-center mb-6'>
             <motion.div
               animate={{ y: [0, -10, 0] }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                repeatType: 'reverse',
-              }}
+              transition={{ duration: 2, repeat: Infinity, repeatType: 'reverse' }}
               className='inline-block'
             >
               <ShieldCheckIcon className='h-16 w-16 text-blue-500 mx-auto mb-4' />
             </motion.div>
-            <h1 className='text-3xl font-bold text-purple-700 mb-2'>
-              Join the Adventure!
-            </h1>
-            <p className='text-blue-700'>
-              Create an account to start your cyber security journey
-            </p>
+            <h1 className='text-3xl font-bold text-purple-700 mb-2'>Join the Adventure!</h1>
+            <p className='text-blue-700'>Create an account to start your cyber security journey</p>
+          </div>
+
+          {/* Privacy notice */}
+          <div className='bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 mb-4 text-sm text-blue-700'>
+            🔒 <strong>Privacy first:</strong> We only store your username and password. No email, no personal info collected.
           </div>
 
           {error && (
@@ -126,11 +101,9 @@ export default function RegisterPage() {
           )}
 
           <form onSubmit={handleSubmit} className='space-y-4'>
+            {/* Username */}
             <div>
-              <label
-                htmlFor='username'
-                className='block text-blue-700 font-medium mb-1'
-              >
+              <label htmlFor='username' className='block text-blue-700 font-medium mb-1'>
                 Username
               </label>
               <div className='relative'>
@@ -143,45 +116,23 @@ export default function RegisterPage() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
+                  autoComplete='username'
                   className='w-full pl-10 pr-3 py-2 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'
                   placeholder='CyberHero123'
                   minLength={3}
                   maxLength={20}
+                  pattern='[a-zA-Z0-9_]+'
+                  title='Letters, numbers and underscores only'
                 />
               </div>
               <p className='text-xs text-blue-600 mt-1'>
-                This will be displayed on the leaderboard
+                This will be displayed on the leaderboard (letters, numbers, underscores)
               </p>
             </div>
 
+            {/* Password */}
             <div>
-              <label
-                htmlFor='email'
-                className='block text-blue-700 font-medium mb-1'
-              >
-                Email
-              </label>
-              <div className='relative'>
-                <div className='absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none'>
-                  <EnvelopeIcon className='h-5 w-5 text-blue-400' />
-                </div>
-                <input
-                  id='email'
-                  type='email'
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className='w-full pl-10 pr-3 py-2 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'
-                  placeholder='your-email@example.com'
-                />
-              </div>
-            </div>
-
-            <div>
-              <label
-                htmlFor='password'
-                className='block text-blue-700 font-medium mb-1'
-              >
+              <label htmlFor='password' className='block text-blue-700 font-medium mb-1'>
                 Password
               </label>
               <div className='relative'>
@@ -194,21 +145,18 @@ export default function RegisterPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  autoComplete='new-password'
                   className='w-full pl-10 pr-3 py-2 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'
                   placeholder='••••••••'
                   minLength={6}
                 />
               </div>
-              <p className='text-xs text-blue-600 mt-1'>
-                Must be at least 6 characters
-              </p>
+              <p className='text-xs text-blue-600 mt-1'>Must be at least 6 characters</p>
             </div>
 
+            {/* Confirm Password */}
             <div>
-              <label
-                htmlFor='confirmPassword'
-                className='block text-blue-700 font-medium mb-1'
-              >
+              <label htmlFor='confirmPassword' className='block text-blue-700 font-medium mb-1'>
                 Confirm Password
               </label>
               <div className='relative'>
@@ -221,6 +169,7 @@ export default function RegisterPage() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
+                  autoComplete='new-password'
                   className='w-full pl-10 pr-3 py-2 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'
                   placeholder='••••••••'
                 />
@@ -230,9 +179,7 @@ export default function RegisterPage() {
             <button
               type='submit'
               disabled={loading}
-              className={`btn-primary w-full py-3 ${
-                loading ? 'opacity-70 cursor-not-allowed' : ''
-              }`}
+              className={`btn-primary w-full py-3 ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
             >
               {loading ? 'Creating Account...' : 'Create Account'}
             </button>
@@ -241,10 +188,7 @@ export default function RegisterPage() {
           <div className='mt-6 text-center'>
             <p className='text-blue-700'>
               Already have an account?{' '}
-              <Link
-                href='/auth/login'
-                className='text-purple-600 font-bold hover:text-purple-800'
-              >
+              <Link href='/auth/login' className='text-purple-600 font-bold hover:text-purple-800'>
                 Sign In
               </Link>
             </p>

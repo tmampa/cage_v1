@@ -1,151 +1,82 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
-import { db } from '../lib/firebase';
-import { collection, addDoc, doc, setDoc, Timestamp } from 'firebase/firestore';
 
-// Create the chatbot context
 const ChatbotContext = createContext({});
 
-// Custom hook to use the chatbot context
-export const useChatbot = () => {
-  return useContext(ChatbotContext);
-};
+export const useChatbot = () => useContext(ChatbotContext);
 
-// Session storage keys
 const STORAGE_KEYS = {
   CHAT_HISTORY: 'cage_chat_history',
   WIDGET_STATE: 'cage_widget_state',
   WIDGET_POSITION: 'cage_widget_position',
 };
 
-// Maximum number of message exchanges to keep in history
 const MAX_HISTORY_EXCHANGES = 20;
 
-// Provider component that wraps the app and makes chatbot available
 export function ChatbotProvider({ children }) {
   const [messages, setMessages] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [position, setPosition] = useState({ x: 20, y: 20 });
   const [unreadCount, setUnreadCount] = useState(0);
-  const sessionIdRef = useRef(`session_${Date.now()}`);
-  const [currentUserId, setCurrentUserId] = useState(null);
+  // setUserId is kept for API compatibility with ChatUserSync
+  const setUserId = useCallback(() => {}, []);
 
-  // Allow external code (AuthContext) to set the user id for Firestore persistence
-  const setUserId = useCallback((uid) => {
-    setCurrentUserId(uid);
-  }, []);
-
-  // Persist a single chat message to Firestore (fire-and-forget)
-  const persistMessage = useCallback(
-    (msg) => {
-      if (!currentUserId) return; // guest users – skip persistence
-      const sid = sessionIdRef.current;
-
-      // Ensure parent docs exist so admin queries can discover them
-      const userDocRef = doc(db, 'chat_history', currentUserId);
-      setDoc(userDocRef, { lastMessageAt: Timestamp.now() }, { merge: true }).catch(() => {});
-
-      const sessionDocRef = doc(db, 'chat_history', currentUserId, 'sessions', sid);
-      setDoc(sessionDocRef, { startedAt: Timestamp.now() }, { merge: true }).catch(() => {});
-
-      const messagesRef = collection(
-        db,
-        'chat_history',
-        currentUserId,
-        'sessions',
-        sid,
-        'messages'
-      );
-      addDoc(messagesRef, {
-        role: msg.role,
-        content: msg.content,
-        timestamp: Timestamp.now(),
-      }).catch((err) => console.error('Failed to persist chat message:', err));
-    },
-    [currentUserId]
-  );
-
-  // Load chat history and widget state from session storage on mount
   useEffect(() => {
     try {
-      // Load chat history
       const savedHistory = sessionStorage.getItem(STORAGE_KEYS.CHAT_HISTORY);
       if (savedHistory) {
         const parsed = JSON.parse(savedHistory);
         setMessages(parsed.messages || []);
       }
 
-      // Load widget state
       const savedWidgetState = sessionStorage.getItem(STORAGE_KEYS.WIDGET_STATE);
       if (savedWidgetState) {
         const parsed = JSON.parse(savedWidgetState);
         setIsOpen(parsed.isOpen || false);
       }
 
-      // Load widget position from localStorage (persists across sessions)
       const savedPosition = localStorage.getItem(STORAGE_KEYS.WIDGET_POSITION);
       if (savedPosition) {
-        const parsed = JSON.parse(savedPosition);
-        setPosition(parsed);
+        setPosition(JSON.parse(savedPosition));
       }
     } catch (error) {
       console.error('Error loading chatbot state from storage:', error);
     }
   }, []);
 
-  // Save chat history to session storage whenever messages change
   useEffect(() => {
     try {
       if (messages.length > 0) {
-        const historyData = {
+        sessionStorage.setItem(STORAGE_KEYS.CHAT_HISTORY, JSON.stringify({
           messages,
           lastUpdated: new Date().toISOString(),
-          sessionId: Date.now().toString(),
-        };
-        sessionStorage.setItem(STORAGE_KEYS.CHAT_HISTORY, JSON.stringify(historyData));
+        }));
       }
-    } catch (error) {
-      console.error('Error saving chat history:', error);
-    }
+    } catch { /* ignore */ }
   }, [messages]);
 
-  // Save widget state to session storage
   useEffect(() => {
     try {
-      const widgetState = { isOpen };
-      sessionStorage.setItem(STORAGE_KEYS.WIDGET_STATE, JSON.stringify(widgetState));
-    } catch (error) {
-      console.error('Error saving widget state:', error);
-    }
+      sessionStorage.setItem(STORAGE_KEYS.WIDGET_STATE, JSON.stringify({ isOpen }));
+    } catch { /* ignore */ }
   }, [isOpen]);
 
-  // Save widget position to localStorage
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEYS.WIDGET_POSITION, JSON.stringify(position));
-    } catch (error) {
-      console.error('Error saving widget position:', error);
-    }
+    } catch { /* ignore */ }
   }, [position]);
 
-  // Trim message history to keep only the most recent exchanges
   const trimMessageHistory = useCallback((messageList) => {
-    // Keep only the most recent MAX_HISTORY_EXCHANGES * 2 messages
-    // (each exchange is 2 messages: user + assistant)
     const maxMessages = MAX_HISTORY_EXCHANGES * 2;
-    if (messageList.length > maxMessages) {
-      return messageList.slice(-maxMessages);
-    }
-    return messageList;
+    return messageList.length > maxMessages ? messageList.slice(-maxMessages) : messageList;
   }, []);
 
-  // Send a message to the chatbot
   const sendMessage = useCallback(async (text) => {
     if (!text.trim()) return;
 
-    // Create user message
     const userMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
@@ -153,41 +84,26 @@ export function ChatbotProvider({ children }) {
       timestamp: new Date(),
     };
 
-    // Add user message to state
     setMessages((prev) => [...prev, userMessage]);
-    persistMessage(userMessage);
     setIsLoading(true);
 
     try {
-      // Prepare conversation history for API
       const conversationHistory = messages.map((msg) => ({
         role: msg.role,
         content: msg.content,
       }));
 
-      // Call the API
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: text.trim(),
-          conversationHistory,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text.trim(), conversationHistory }),
       });
 
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`API error: ${response.status}`);
 
       const data = await response.json();
+      if (data.error) throw new Error(data.error);
 
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
-      // Create assistant message
       const assistantMessage = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
@@ -195,76 +111,44 @@ export function ChatbotProvider({ children }) {
         timestamp: new Date(),
       };
 
-      // Add assistant message and trim history
       setMessages((prev) => trimMessageHistory([...prev, assistantMessage]));
-      persistMessage(assistantMessage);
 
-      // Increment unread count if widget is closed
-      if (!isOpen) {
-        setUnreadCount((prev) => prev + 1);
-      }
+      if (!isOpen) setUnreadCount((prev) => prev + 1);
     } catch (error) {
       console.error('Error sending message:', error);
-
-      // Add error message
-      const errorMessage = {
-        id: `error-${Date.now()}`,
-        role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again later.',
-        timestamp: new Date(),
-      };
-
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `error-${Date.now()}`,
+          role: 'assistant',
+          content: 'Sorry, I encountered an error. Please try again later.',
+          timestamp: new Date(),
+        },
+      ]);
     } finally {
       setIsLoading(false);
     }
-  }, [messages, isOpen, trimMessageHistory, persistMessage]);
+  }, [messages, isOpen, trimMessageHistory]);
 
-  // Clear chat history
   const clearChat = useCallback(() => {
     setMessages([]);
     setUnreadCount(0);
-    try {
-      sessionStorage.removeItem(STORAGE_KEYS.CHAT_HISTORY);
-    } catch (error) {
-      console.error('Error clearing chat history:', error);
-    }
+    try { sessionStorage.removeItem(STORAGE_KEYS.CHAT_HISTORY); } catch { /* ignore */ }
   }, []);
 
-  // Toggle chatbot open/closed state
   const toggleChatbot = useCallback(() => {
     setIsOpen((prev) => {
-      const newState = !prev;
-      // Reset unread count when opening
-      if (newState) {
-        setUnreadCount(0);
-      }
-      return newState;
+      if (!prev) setUnreadCount(0);
+      return !prev;
     });
   }, []);
 
-  // Update widget position
-  const updatePosition = useCallback((x, y) => {
-    setPosition({ x, y });
-  }, []);
+  const updatePosition = useCallback((x, y) => setPosition({ x, y }), []);
 
-  // The value that will be supplied to any consuming components
   const value = {
-    messages,
-    isOpen,
-    isLoading,
-    position,
-    unreadCount,
-    sendMessage,
-    clearChat,
-    toggleChatbot,
-    updatePosition,
-    setUserId,
+    messages, isOpen, isLoading, position, unreadCount,
+    sendMessage, clearChat, toggleChatbot, updatePosition, setUserId,
   };
 
-  return (
-    <ChatbotContext.Provider value={value}>
-      {children}
-    </ChatbotContext.Provider>
-  );
+  return <ChatbotContext.Provider value={value}>{children}</ChatbotContext.Provider>;
 }

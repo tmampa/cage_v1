@@ -16,7 +16,6 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { useChatbot } from '../../context/ChatbotContext';
-import { getFirebaseLeaderboardData } from '../../lib/firebase';
 
 import EnhancedButton from '../../components/EnhancedButton';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -39,15 +38,15 @@ export default function LeaderboardPage() {
   async function fetchLeaderboardData() {
     try {
       setLoading(true);
-      const data = await getFirebaseLeaderboardData(timeFilter);
-      setLeaderboardData(data);
+      const res = await fetch(`/api/leaderboard?filter=${timeFilter}`);
+      const data = await res.json();
+      const leaderboard = data.leaderboard || [];
+      setLeaderboardData(leaderboard);
 
       // Find user's rank if they're logged in
       if (user?.id) {
-        const userIndex = data.findIndex((player) => player.userId === user.id);
-        if (userIndex !== -1) {
-          setUserRank(userIndex + 1);
-        }
+        const userIndex = leaderboard.findIndex((player) => player.id === user.id);
+        if (userIndex !== -1) setUserRank(userIndex + 1);
       }
 
       setError(null);
@@ -278,11 +277,11 @@ export default function LeaderboardPage() {
             >
               {filteredData.map((player, index) => {
                 const rankStyling = getRankStyling(index);
-                const isCurrentUser = player.userId === user?.id;
+                const isCurrentUser = player.id === user?.id;
                 
                 return (
                   <motion.div
-                    key={player.userId}
+                    key={player.id}
                     variants={itemVariants}
                     whileHover={{ scale: 1.02, y: -2 }}
                     className={`
@@ -323,7 +322,7 @@ export default function LeaderboardPage() {
                         w-12 h-12 rounded-full flex items-center justify-center text-2xl mr-4
                         ${index < 3 ? 'bg-white shadow-md' : 'bg-gray-100'}
                       `}>
-                        {player.avatar_emoji || '👤'}
+                          {player.avatarEmoji || '👤'}
                       </div>
 
                       {/* Player Info */}

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
-import { adminDb } from '../../../../lib/firebaseAdmin';
-import { verifyAdmin } from '../../../../lib/verifyAdmin';
+import { db } from '../../../../lib/db.js';
+import { feedback } from '../../../../db/schema.js';
+import { verifyAdmin } from '../../../../lib/verifyAdmin.js';
+import { eq, desc } from 'drizzle-orm';
 
 export async function GET(request) {
   try {
@@ -11,45 +13,42 @@ export async function GET(request) {
     const filterType = searchParams.get('type') || 'all';
     const filterStatus = searchParams.get('status') || 'all';
 
-    let q = adminDb.collection('feedback').orderBy('createdAt', 'desc');
+    let rows = await db
+      .select()
+      .from(feedback)
+      .orderBy(desc(feedback.createdAt))
+      .limit(limitNum);
 
     if (filterType !== 'all') {
-      q = q.where('feedbackType', '==', filterType);
+      rows = rows.filter(f => f.feedbackType === filterType);
     }
 
-    const snapshot = await q.limit(limitNum).get();
-
-    let feedback = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-
-    // Client-side status filter (resolved boolean)
     if (filterStatus === 'resolved') {
-      feedback = feedback.filter((f) => f.resolved === true);
+      rows = rows.filter(f => f.resolved === true);
     } else if (filterStatus === 'unresolved') {
-      feedback = feedback.filter((f) => !f.resolved);
+      rows = rows.filter(f => !f.resolved);
     }
 
-    return NextResponse.json({ feedback });
+    return NextResponse.json({ feedback: rows });
   } catch (error) {
     const status = error.message.includes('Forbidden') ? 403 : error.message.includes('Missing') ? 401 : 500;
     return NextResponse.json({ error: error.message }, { status });
   }
 }
 
-// PATCH – toggle resolved status
 export async function PATCH(request) {
   try {
     await verifyAdmin(request);
-    const body = await request.json();
-    const { feedbackId, resolved } = body;
+    const { feedbackId, resolved } = await request.json();
 
     if (!feedbackId) {
       return NextResponse.json({ error: 'feedbackId required' }, { status: 400 });
     }
 
-    await adminDb.collection('feedback').doc(feedbackId).update({ resolved: !!resolved });
+    await db
+      .update(feedback)
+      .set({ resolved: !!resolved })
+      .where(eq(feedback.id, Number(feedbackId)));
 
     return NextResponse.json({ success: true });
   } catch (error) {
