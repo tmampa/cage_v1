@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import { NextResponse } from "next/server";
 import fs from 'fs/promises';
 import path from 'path';
+import { GEMINI_MODEL } from "../../../lib/gemini.js";
 
 // Initialize the Gemini API with server-only key
 const ai = new GoogleGenAI({
@@ -167,7 +168,7 @@ async function generateQuestionsForLevel(levelId) {
   while (retryCount < maxRetries) {
     try {
       const result = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: GEMINI_MODEL,
         contents: prompt,
         generationConfig: {
           temperature: 0.5,

@@ -151,5 +151,101 @@
       }
     ],
     "timestamp": 1785177769060
+  },
+  "3": {
+    "questions": [
+      {
+        "question": "You receive an urgent email from your company's IT department stating your password expires in 2 hours, and you must click a link to keep your current password. What is the most reliable first step to verify this?",
+        "options": [
+          "Forward the email to all your colleagues to warn them.",
+          "Reply to the email asking the sender if they are legitimate.",
+          "Click the link immediately to check if the login page is secure.",
+          "Open a separate browser window, go to the official company portal independently, and check your password settings."
+        ],
+        "correctIndex": 3,
+        "explanation": "Navigating independently using a known, trusted bookmark or URL avoids interacting with potentially malicious links provided directly in a suspicious email.",
+        "hint": "Consider how you usually access your company services without relying on links provided in unsolicited messages.",
+        "levelId": 3
+      },
+      {
+        "question": "You hover your mouse cursor over a hyperlink in an email claiming to be from your bank. The displayed text says 'www.mybank.com/secure-login', but the actual URL preview points to 'http://www.my-bank-secure-update.com/login'. What does this indicate?",
+        "options": [
+          "It is a phishing attempt masking a malicious external website behind deceptive anchor text.",
+          "The bank is using a content delivery network with a different naming convention.",
+          "It is a secure HTTPS redirect used for standard banking procedures.",
+          "The link is completely safe because the displayed text matches the official domain."
+        ],
+        "correctIndex": 0,
+        "explanation": "Attackers frequently use deceptive anchor text to trick users into believing a link goes to a legitimate site while actually directing them to a spoofed domain.",
+        "hint": "Always check where the link actually leads rather than trusting the text you are told to click.",
+        "levelId": 3
+      },
+      {
+        "question": "An email arrives from a known vendor requesting an immediate change to their payment remittance bank accounts for an upcoming invoice, emphasizing extreme confidentiality. This scenario is a classic example of which social engineering tactic?",
+        "options": [
+          "Drive-by download",
+          "Business Email Compromise (BEC) / Vendor Email Fraud",
+          "Distributed Denial of Service (DDoS)",
+          "Watering hole attack"
+        ],
+        "correctIndex": 1,
+        "explanation": "Business Email Compromise (BEC) often involves impersonating executives or vendors to urgently divert financial transactions to fraudulent accounts.",
+        "hint": "Think about scams targeting financial transactions through fraudulent payment diversion instructions.",
+        "levelId": 3
+      },
+      {
+        "question": "Which of the following URL structures is the strongest indicator of a potential phishing site trying to impersonate 'paypal.com'?",
+        "options": [
+          "https://history.paypal.com/statement",
+          "https://www.paypal-support.com/help",
+          "https://paypal.com.customer-support-update.net/login",
+          "https://www.paypal.com/us/home"
+        ],
+        "correctIndex": 2,
+        "explanation": "In URL structure, the actual domain name is read from right to left (just before the first single slash). In 'paypal.com.customer-support-update.net', the true domain is 'customer-support-update.net', making paypal.com just a subfolder or subdomain decoy.",
+        "hint": "Look closely at the registered domain name right before the first forward slash in the URL.",
+        "levelId": 3
+      },
+      {
+        "question": "You receive an email from a courier service stating a package could not be delivered and asking you to pay a small $1.50 redelivery fee by entering your credit card details on an attached form. What is the primary red flag here?",
+        "options": [
+          "Courier services never use email for delivery notifications.",
+          "Legitimate delivery services typically do not request unexpected online payments or credit card details via unsolicited messages for redelivery.",
+          "The fee amount is too high for a standard package.",
+          "The email does not contain a tracking number."
+        ],
+        "correctIndex": 1,
+        "explanation": "Scammers often use minor fees (like small customs or redelivery charges) as bait to harvest credit card credentials from victims.",
+        "hint": "Consider whether real shipping companies ask for sudden credit card payments via unsolicited emails for small fees.",
+        "levelId": 3
+      },
+      {
+        "question": "During a phone call, a caller claiming to be from internal HR creates panic by stating your employee benefits will be immediately canceled unless you verify your social security number and corporate credentials right away. This tactic relies heavily on which psychological trigger?",
+        "options": [
+          "Authority bias alone",
+          "Social proof",
+          "Reciprocity",
+          "Urgency and fear"
+        ],
+        "correctIndex": 3,
+        "explanation": "Creating a sense of artificial urgency and fear prevents the victim from pausing to think critically or verify the request through official channels.",
+        "hint": "When someone tries to rush you and makes you afraid of losing something important, what psychological lever are they pulling?",
+        "levelId": 3
+      },
+      {
+        "question": "An unexpected email from the 'CEO' arrives in your inbox asking you to quickly purchase digital gift cards for a client appreciation event and send the redemption codes back via email. What should you do first?",
+        "options": [
+          "Forward the email to the external press.",
+          "Reply directly to the email asking for confirmation.",
+          "Verify the request through an independent, trusted out-of-band communication channel, such as calling the CEO directly via known internal directory numbers.",
+          "Buy the gift cards immediately to impress the CEO."
+        ],
+        "correctIndex": 2,
+        "explanation": "Gift card scams are extremely common. Verifying through an independent, pre-established channel (like a verified phone call or messaging app) confirms if the request is real.",
+        "hint": "Never trust the contact details or communication thread provided inside a suspicious email; verify using a known, trusted method.",
+        "levelId": 3
+      }
+    ],
+    "timestamp": 1785178576370
   }
 }

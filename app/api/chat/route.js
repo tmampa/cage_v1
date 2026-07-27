@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { eq } from 'drizzle-orm';
 import { db } from '../../../lib/db.js';
 import { COOKIE_NAME, verifyJWT } from '../../../lib/auth.js';
+import { GEMINI_MODEL } from '../../../lib/gemini.js';
 import { chatMessages, users } from '../../../db/schema.js';
 import { checkRateLimit, RATE_LIMIT_CONFIG } from '@/utils/rateLimiter';
 
@@ -145,7 +146,7 @@ export async function POST(request) {
     }
     
     // Get model configuration from environment or use defaults
-    const modelName = process.env.GEMINI_MODEL || 'gemini-3-flash-preview';
+    const modelName = GEMINI_MODEL;
     const maxTokens = parseInt(process.env.GEMINI_MAX_TOKENS || '500', 10);
     const temperature = parseFloat(process.env.GEMINI_TEMPERATURE || '0.7');
     
@@ -240,6 +241,6 @@ export async function GET() {
   return NextResponse.json({
     status: 'ok',
     configured: !!process.env.GEMINI_API_KEY,
-    model: process.env.GEMINI_MODEL || 'gemini-3-flash-preview',
+    model: GEMINI_MODEL,
   });
 }
