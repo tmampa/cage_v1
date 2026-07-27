@@ -68,5 +68,88 @@
       }
     ],
     "timestamp": 1777531887132
+  },
+  "2": {
+    "questions": [
+      {
+        "question": "You are creating a new account for an online store. Which of the following passwords would be considered the strongest and most secure?",
+        "options": [
+          "Tr0ub4dor&3",
+          "Mountain-Cloud-Purple-7",
+          "Welcome!",
+          "password123"
+        ],
+        "correctIndex": 1,
+        "explanation": "Longer passphrases (like four random words) are generally more secure and harder for computers to crack than shorter passwords, even those with symbols. They are also easier for humans to remember.",
+        "hint": "Consider which option provides the most length while remaining difficult for a computer to guess.",
+        "levelId": 2
+      },
+      {
+        "question": "What is the safest way to manage dozens of different passwords for your various online accounts?",
+        "options": [
+          "Use the same strong password for every account.",
+          "Use a reputable digital password manager.",
+          "Save them in a document named 'Passwords' on your desktop.",
+          "Write them in a notebook kept next to your computer."
+        ],
+        "correctIndex": 1,
+        "explanation": "A password manager encrypts your credentials and allows you to use unique, complex passwords for every site without having to memorize them all.",
+        "hint": "Think of a digital tool specifically designed to store and protect login information.",
+        "levelId": 2
+      },
+      {
+        "question": "After entering your password on a banking website, the site asks you to enter a 6-digit code sent to your smartphone. What is this security layer called?",
+        "options": [
+          "Password Recovery",
+          "Biometric Scanning",
+          "Single Sign-On (SSO)",
+          "Two-Factor Authentication (2FA)"
+        ],
+        "correctIndex": 3,
+        "explanation": "Two-Factor Authentication (2FA) adds a second layer of security by requiring something you know (password) and something you have (phone/code).",
+        "hint": "The name refers to using 'two' different methods to verify your identity.",
+        "levelId": 2
+      },
+      {
+        "question": "Why is it considered a 'bad practice' to reuse the same password across multiple websites, such as your email and your social media?",
+        "options": [
+          "Websites will detect the duplicate and lock your account.",
+          "It makes it harder for you to remember your passwords.",
+          "It takes up too much storage space on the website's server.",
+          "If one website is breached, hackers can access all your other accounts."
+        ],
+        "correctIndex": 3,
+        "explanation": "Credential stuffing is a common attack where hackers take passwords leaked from one site and try them on others. Using unique passwords prevents one leak from compromising everything.",
+        "hint": "Think about the 'domino effect' if a single secret is discovered by a criminal.",
+        "levelId": 2
+      },
+      {
+        "question": "You receive an email that looks like it's from your IT department asking you to 'verify your password' by clicking a link. What should you do?",
+        "options": [
+          "Delete the email or report it to your actual IT department without clicking.",
+          "Reply to the email with your current password to be helpful.",
+          "Click the link but only enter a fake password to test it.",
+          "Click the link immediately to ensure your account stays active."
+        ],
+        "correctIndex": 0,
+        "explanation": "This is a phishing attempt. Legitimate organizations will never ask you to provide or 'verify' your password via an emailed link.",
+        "hint": "Legitimate companies never ask for your secret credentials through an unsolicited email.",
+        "levelId": 2
+      },
+      {
+        "question": "When creating a security question for password recovery (e.g., 'What is your mother's maiden name?'), what is a more secure strategy?",
+        "options": [
+          "Leave the security question blank.",
+          "Use a fake answer that acts like a second password.",
+          "Pick a question that has an answer easily found on your Facebook profile.",
+          "Always tell the truth so you don't forget."
+        ],
+        "correctIndex": 1,
+        "explanation": "Publicly available information (like a pet's name or high school) can be found by hackers. Treating the answer like a password—using a random, made-up phrase—is much more secure.",
+        "hint": "If a stranger can find the answer on your social media, it isn't a good security barrier.",
+        "levelId": 2
+      }
+    ],
+    "timestamp": 1785177769060
   }
 }
