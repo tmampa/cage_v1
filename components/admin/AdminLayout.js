@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
+  ArrowDownTrayIcon,
   ChartBarIcon,
   EnvelopeIcon,
   HomeIcon,
@@ -14,6 +15,7 @@ const navItems = [
   { label: 'Users', href: '/admin/users', icon: UsersIcon },
   { label: 'Feedback', href: '/admin/feedback', icon: EnvelopeIcon },
   { label: 'Analytics', href: '/admin/analytics', icon: ChartBarIcon },
+  { label: 'Export', href: '/admin/export', icon: ArrowDownTrayIcon },
 ];
 
 function isActivePath(pathname, href) {
